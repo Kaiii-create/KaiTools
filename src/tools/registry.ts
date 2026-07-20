@@ -1,0 +1,62 @@
+import type { ToolModule } from "./types";
+import { jsonFormatter } from "./json-formatter";
+import { timestamp } from "./timestamp";
+import { base64Url } from "./base64-url";
+import { qrcode } from "./qrcode";
+import { httpRequester } from "./http-requester";
+import { codeFormatter } from "./code-formatter";
+import { cryptoTool } from "./crypto";
+import { colorTool } from "./color";
+import { worldClock } from "./world-clock";
+import { imageToIco } from "./image-to-ico";
+import { keyboardStats } from "./keyboard-stats";
+import { codeDiff } from "./code-diff";
+import { markdownEditor } from "./markdown-editor";
+
+/** 工具注册表（中央目录）
+ *
+ * 新增工具只需：
+ * 1. 在 ./<tool-id>/ 下实现 ToolModule
+ * 2. 在下方 register(...) 一行
+ */
+const registry = new Map<string, ToolModule>();
+
+function register(tool: ToolModule) {
+  if (registry.has(tool.id)) {
+    console.warn(`[registry] 工具 ${tool.id} 已注册，跳过`);
+    return;
+  }
+  registry.set(tool.id, tool);
+}
+
+// 注册工具
+register(jsonFormatter);
+register(timestamp);
+register(base64Url);
+register(qrcode);
+register(httpRequester);
+register(codeFormatter);
+register(cryptoTool);
+register(colorTool);
+register(worldClock);
+register(imageToIco);
+register(keyboardStats);
+register(codeDiff);
+register(markdownEditor);
+
+export const tools = Array.from(registry.values());
+
+export function getTool(id: string): ToolModule | undefined {
+  return registry.get(id);
+}
+
+export function searchTools(query: string): ToolModule[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return tools;
+  return tools.filter((t) => {
+    const haystack = [t.name, t.description ?? "", ...t.keywords]
+      .join(" ")
+      .toLowerCase();
+    return haystack.includes(q);
+  });
+}

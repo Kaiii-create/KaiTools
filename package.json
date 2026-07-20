@@ -1,0 +1,51 @@
+{
+  "name": "ktool",
+  "private": true,
+  "version": "0.1.0",
+  "description": "KTool - 开子工具箱，轻量级开发工具集",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "icon": "tauri icon"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-dialog": "^2.7.2",
+    "@tauri-apps/plugin-fs": "^2.5.1",
+    "@tauri-apps/plugin-global-shortcut": "^2.3.2",
+    "@tauri-apps/plugin-shell": "^2",
+    "@tauri-apps/plugin-store": "^2.4.4",
+    "@vicons/ionicons5": "^0.12.0",
+    "crypto-js": "^4.2.0",
+    "diff-match-patch": "^1.0.5",
+    "marked": "^18.0.6",
+    "naive-ui": "^2.38.0",
+    "pinia": "^2.2.0",
+    "prettier": "^3.9.5",
+    "qrcode": "^1.5.4",
+    "vue": "^3.5.0",
+    "vue-router": "^4.4.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "@types/crypto-js": "^4.2.2",
+    "@types/diff-match-patch": "^1.0.36",
+    "@types/qrcode": "^1.5.6",
+    "@vitejs/plugin-vue": "^5.1.0",
+    "autoprefixer": "^10.4.0",
+    "postcss": "^8.4.0",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.5.0",
+    "vite": "^5.4.0",
+    "vue-tsc": "^2.1.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "vue-demi"
+    ]
+  }
+}
