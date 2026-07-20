@@ -192,7 +192,7 @@
         <n-card title="关于" size="small">
           <div class="text-sm">
             <div>版本：v0.1.0</div>
-            <div>项目：KTool - 开子工具箱</div>
+            <div>项目：KTool</div>
             <div class="mt-2">
               <a
                 href="https://github.com"

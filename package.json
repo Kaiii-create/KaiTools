@@ -2,7 +2,7 @@
   "name": "ktool",
   "private": true,
   "version": "0.1.0",
-  "description": "KTool - 开子工具箱，轻量级开发工具集",
+  "description": "KTool - 轻量级开发工具集",
   "type": "module",
   "scripts": {
     "dev": "vite",
