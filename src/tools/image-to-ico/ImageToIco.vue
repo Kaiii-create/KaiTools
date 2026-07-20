@@ -1,7 +1,7 @@
 <template>
-  <div class="image-to-ico flex flex-col h-full">
+  <ToolPage>
     <!-- 工具栏 -->
-    <div class="toolbar flex items-center gap-2 px-3 py-2 border-b border-gray-200 dark:border-gray-700">
+    <ToolToolbar>
       <n-button type="primary" size="small" :disabled="!imageLoaded" @click="onConvert">转换为 ICO</n-button>
       <n-button quaternary size="small" :disabled="!converted" @click="onDownload">下载 ICO</n-button>
       <n-button quaternary size="small" @click="onClear">清空</n-button>
@@ -9,7 +9,7 @@
       <n-tag v-if="status" :type="statusType" size="small" round>
         {{ status }}
       </n-tag>
-    </div>
+    </ToolToolbar>
 
     <!-- 配置区 -->
     <div class="config-panel flex-1 overflow-auto p-4">
@@ -84,13 +84,16 @@
         </n-card>
       </n-space>
     </div>
-  </div>
+  </ToolPage>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import { NButton, NCard, NSpace, NSelect, NInputNumber, NTag, NText, NIcon, useMessage } from "naive-ui";
+import ToolPage from "@/components/tool/ToolPage.vue";
+import ToolToolbar from "@/components/tool/ToolToolbar.vue";
 import { CloudUploadOutline as UploadIcon } from "@vicons/ionicons5";
+import { downloadFile } from "@/lib/download";
 
 const message = useMessage();
 
@@ -253,30 +256,12 @@ function concat(arrays: Uint8Array[]): Uint8Array {
 
 async function onDownload() {
   if (!icoBlob.value) return;
-  // 优先用 Tauri 原生保存对话框
   try {
-    const { save } = await import("@tauri-apps/plugin-dialog");
-    const savePath = await save({
-      defaultPath: `icon-${Date.now()}.ico`,
-      filters: [{ name: "ICO 图标", extensions: ["ico"] }],
-    });
-    if (savePath) {
-      // 通过 fetch + writeBinaryFile 写入
-      const { writeFile } = await import("@tauri-apps/plugin-fs");
-      const bytes = new Uint8Array(await icoBlob.value.arrayBuffer());
-      await writeFile(savePath, bytes);
-      message.success(`已保存到 ${savePath}`);
-      return;
-    }
-  } catch {
-    // 非 Tauri 环境回退到浏览器下载
+    const path = await downloadFile(`icon-${Date.now()}.ico`, icoBlob.value);
+    message.success(`已下载到 ${path}`);
+  } catch (e) {
+    message.error((e as Error).message || "下载失败");
   }
-  // 浏览器回退
-  const link = document.createElement("a");
-  link.download = `icon-${Date.now()}.ico`;
-  link.href = URL.createObjectURL(icoBlob.value);
-  link.click();
-  message.success("已下载");
 }
 
 function onClear() {

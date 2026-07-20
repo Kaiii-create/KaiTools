@@ -2,8 +2,90 @@
 @tailwind components;
 @tailwind utilities;
 
+/* =========================================================================
+   KTool 设计令牌（Design Tokens）
+   中性灰背景 + 单一靛蓝品牌色。浅色 / 深色双主题。
+   圆角三档：6 / 8 / 12px。统一 4px 间距系统（由 Tailwind 提供）。
+   ========================================================================= */
 :root {
-  --ktool-brand: #3b82f6;
+  /* —— 品牌色（靛蓝，单一色相） —— */
+  --ktool-brand: #4f46e5;
+  --ktool-brand-hover: #4338ca;
+  --ktool-brand-active: #3730a3;
+  --ktool-brand-contrast: #ffffff;
+  --ktool-brand-soft: rgba(79, 70, 229, 0.1);
+  --ktool-brand-soft-2: rgba(79, 70, 229, 0.16);
+
+  /* —— 危险色（克制） —— */
+  --ktool-danger: #e5484d;
+  --ktool-danger-hover: #d23b40;
+  --ktool-danger-soft: rgba(229, 72, 77, 0.1);
+
+  /* —— 浅色背景层次（中性灰） —— */
+  --ktool-bg: #f6f7f9;
+  --ktool-windowbar: #f7f7f8;
+  --ktool-window-border: rgba(20, 24, 32, 0.18);
+  --ktool-surface: #ffffff;
+  --ktool-surface-2: #f1f2f5;
+  --ktool-surface-3: #e9ebef;
+  --ktool-surface-inset: #f3f4f6;
+
+  /* —— 边框（低对比） —— */
+  --ktool-border: #e4e6ea;
+  --ktool-border-strong: #d4d7dd;
+
+  /* —— 文本 —— */
+  --ktool-text: #1f232b;
+  --ktool-text-soft: #5b626e;
+  --ktool-text-mute: #9298a3;
+
+  /* —— 阴影（轻微） —— */
+  --ktool-shadow-sm: 0 1px 2px rgba(16, 18, 23, 0.04),
+    0 1px 3px rgba(16, 18, 23, 0.06);
+  --ktool-shadow-md: 0 4px 16px rgba(16, 18, 23, 0.08);
+  --ktool-shadow-lg: 0 12px 32px rgba(16, 18, 23, 0.12);
+
+  /* —— 圆角三档 —— */
+  --ktool-radius-sm: 6px;
+  --ktool-radius: 8px;
+  --ktool-radius-lg: 12px;
+
+  /* —— 过渡 —— */
+  --ktool-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --ktool-duration: 0.18s;
+}
+
+.dark {
+  --ktool-brand: #6366f1;
+  --ktool-brand-hover: #818cf8;
+  --ktool-brand-active: #4f46e5;
+  --ktool-brand-contrast: #ffffff;
+  --ktool-brand-soft: rgba(99, 102, 241, 0.16);
+  --ktool-brand-soft-2: rgba(99, 102, 241, 0.26);
+
+  --ktool-danger: #f2555a;
+  --ktool-danger-hover: #ff6b70;
+  --ktool-danger-soft: rgba(242, 85, 90, 0.14);
+
+  /* —— 深色背景层次（非纯黑） —— */
+  --ktool-bg: #0e1014;
+  --ktool-windowbar: #17191e;
+  --ktool-window-border: rgba(255, 255, 255, 0.13);
+  --ktool-surface: #16181d;
+  --ktool-surface-2: #1b1e24;
+  --ktool-surface-3: #23272f;
+  --ktool-surface-inset: #121419;
+
+  --ktool-border: #262a32;
+  --ktool-border-strong: #333943;
+
+  --ktool-text: #e7e9ed;
+  --ktool-text-soft: #a7aeb9;
+  --ktool-text-mute: #6b7280;
+
+  --ktool-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --ktool-shadow-md: 0 6px 18px rgba(0, 0, 0, 0.45);
+  --ktool-shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.55);
 }
 
 * {
@@ -17,24 +99,84 @@ body,
   padding: 0;
   height: 100%;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
-    "Microsoft YaHei", sans-serif;
+    "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
+  color: var(--ktool-text);
+  background: transparent;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
-/* 自定义滚动条 */
+/* 桌面小插件模式：透明背景，去掉默认底色 */
+html.kbd-widget-mode,
+html.kbd-widget-mode body,
+html.kbd-widget-mode #app {
+  background: transparent !important;
+}
+
+/* —— 自定义滚动条 —— */
+.ktool-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(128, 128, 128, 0.32) transparent;
+}
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 9px;
+  height: 9px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(128, 128, 128, 0.3);
-  border-radius: 4px;
+  background: rgba(128, 128, 128, 0.28);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(128, 128, 128, 0.5);
+  background-clip: padding-box;
+}
+
+/* —— 通用进入动画（克制） —— */
+@keyframes ktool-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ktool-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.ktool-fade-up {
+  animation: ktool-fade-up 0.2s var(--ktool-ease) both;
+}
+.ktool-pop {
+  animation: ktool-pop 0.16s var(--ktool-ease) both;
+}
+
+/* 工作区切换：内容渐入 */
+.workspace-enter-active {
+  animation: ktool-fade-up 0.22s var(--ktool-ease) both;
+}
+
+/* 统一 focus 可见性（键盘友好） */
+:focus-visible {
+  outline: 2px solid var(--ktool-brand);
+  outline-offset: 1px;
+  border-radius: var(--ktool-radius-sm);
 }

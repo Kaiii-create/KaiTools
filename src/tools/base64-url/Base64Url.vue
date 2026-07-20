@@ -1,6 +1,6 @@
 <template>
-  <div class="base64-url flex flex-col h-full">
-    <div class="toolbar flex items-center gap-2 px-3 py-2 border-b border-gray-200 dark:border-gray-700">
+  <ToolPage>
+    <ToolToolbar>
       <n-tabs v-model:value="mode" type="segment" size="small" @update:value="run">
         <n-tab name="base64-encode">Base64 编码</n-tab>
         <n-tab name="base64-decode">Base64 解码</n-tab>
@@ -13,22 +13,21 @@
       <n-button size="small" quaternary @click="onSwap" :disabled="!output">↑↓ 交换</n-button>
       <n-button size="small" quaternary @click="onCopyOutput" :disabled="!output">复制结果</n-button>
       <n-button size="small" quaternary @click="onClear">清空</n-button>
-    </div>
+    </ToolToolbar>
 
     <div class="flex-1 grid grid-cols-2 gap-2 p-2 min-h-0">
       <div class="flex flex-col min-h-0">
-        <div class="text-xs text-gray-500 mb-1 px-1">输入</div>
+        <div class="text-xs text-[var(--ktool-text-mute)] mb-1 px-1">输入</div>
         <n-input
           v-model:value="input"
           type="textarea"
           placeholder="输入要编码/解码的内容（自动转换）"
           class="flex-1"
           style="height: 100%"
-          round
         />
       </div>
       <div class="flex flex-col min-h-0">
-        <div class="text-xs text-gray-500 mb-1 px-1">输出</div>
+        <div class="text-xs text-[var(--ktool-text-mute)] mb-1 px-1">输出</div>
         <n-input
           v-model:value="output"
           type="textarea"
@@ -36,7 +35,6 @@
           readonly
           class="flex-1"
           style="height: 100%"
-          round
         />
       </div>
     </div>
@@ -51,12 +49,14 @@
     >
       {{ errorMsg }}
     </n-alert>
-  </div>
+  </ToolPage>
 </template>
 
 <script setup lang="ts">
 import { ref, watch } from "vue";
 import { NButton, NInput, NTabs, NTab, NDivider, NAlert, useMessage } from "naive-ui";
+import ToolPage from "@/components/tool/ToolPage.vue";
+import ToolToolbar from "@/components/tool/ToolToolbar.vue";
 
 const message = useMessage();
 

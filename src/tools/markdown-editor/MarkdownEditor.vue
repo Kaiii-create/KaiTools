@@ -1,7 +1,7 @@
 <template>
-  <div class="md-editor flex flex-col h-full">
+  <ToolPage>
     <!-- 工具栏 -->
-    <div class="toolbar flex items-center gap-1 px-3 py-2 border-b border-gray-200 dark:border-gray-700">
+    <ToolToolbar>
       <n-button-group size="small">
         <n-button @click="insertAtCursor('# ')">H1</n-button>
         <n-button @click="insertAtCursor('## ')">H2</n-button>
@@ -29,38 +29,40 @@
         <n-radio-button value="edit">编辑</n-radio-button>
         <n-radio-button value="preview">预览</n-radio-button>
       </n-radio-group>
-    </div>
+    </ToolToolbar>
 
     <!-- 内容区 -->
     <div class="flex-1 flex min-h-0">
       <!-- 编辑区 -->
-      <div v-show="view !== 'preview'" class="flex-1 flex flex-col border-r border-gray-200 dark:border-gray-700" style="width: 50%">
+      <div v-show="view !== 'preview'" class="flex-1 min-w-0 flex flex-col border-r border-gray-200 dark:border-gray-700">
         <div class="px-3 py-1 text-xs text-gray-500 bg-gray-50 dark:bg-gray-800">Markdown</div>
         <textarea
           ref="textareaRef"
           v-model="text"
-          class="flex-1 p-3 font-mono text-sm bg-transparent outline-none resize-none"
+          class="flex-1 min-w-0 p-3 font-mono text-sm bg-transparent outline-none resize-none"
           placeholder="# 标题&#10;&#10;输入 Markdown 内容..."
           @scroll="syncScroll('edit', $event)"
         />
       </div>
       <!-- 预览区 -->
-      <div v-show="view !== 'edit'" class="flex-1 flex flex-col" style="width: 50%">
+      <div v-show="view !== 'edit'" class="flex-1 min-w-0 flex flex-col">
         <div class="px-3 py-1 text-xs text-gray-500 bg-gray-50 dark:bg-gray-800">预览</div>
         <div
           ref="previewRef"
-          class="flex-1 overflow-auto p-4 markdown-body"
+          class="flex-1 min-w-0 overflow-auto p-4 markdown-body"
           @scroll="syncScroll('preview', $event)"
           v-html="html"
         />
       </div>
     </div>
-  </div>
+  </ToolPage>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
 import { NButton, NButtonGroup, NRadioGroup, NRadioButton, useMessage } from "naive-ui";
+import ToolPage from "@/components/tool/ToolPage.vue";
+import ToolToolbar from "@/components/tool/ToolToolbar.vue";
 import { marked } from "marked";
 
 const message = useMessage();
@@ -179,7 +181,7 @@ function onClear() {
 .markdown-body code { background: rgba(0,0,0,0.06); padding: 2px 6px; border-radius: 3px; font-family: 'Consolas', 'Monaco', monospace; font-size: 0.9em; }
 .markdown-body pre { background: rgba(0,0,0,0.06); padding: 12px; border-radius: 4px; overflow-x: auto; margin: 0.6em 0; }
 .markdown-body pre code { background: none; padding: 0; }
-.markdown-body table { border-collapse: collapse; margin: 0.6em 0; width: 100%; }
+.markdown-body table { border-collapse: collapse; margin: 0.6em 0; width: 100%; display: block; overflow-x: auto; }
 .markdown-body th, .markdown-body td { border: 1px solid #ddd; padding: 6px 12px; text-align: left; }
 .markdown-body th { background: rgba(0,0,0,0.04); font-weight: bold; }
 .markdown-body a { color: #3b82f6; text-decoration: none; }

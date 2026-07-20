@@ -1,7 +1,7 @@
 <template>
-  <div class="world-clock flex flex-col h-full">
+  <ToolPage>
     <!-- 工具栏 -->
-    <div class="toolbar flex items-center gap-2 px-3 py-2 border-b border-gray-200 dark:border-gray-700">
+    <ToolToolbar>
       <n-select
         v-model:value="newCityKey"
         :options="allCities"
@@ -13,34 +13,39 @@
       <n-button type="primary" size="small" :disabled="!newCityKey" @click="onAddCity">添加</n-button>
       <div class="flex-1" />
       <n-tag size="small" round type="info">本地：{{ localTime }}</n-tag>
-    </div>
+    </ToolToolbar>
 
     <!-- 城市列表 -->
     <div class="flex-1 overflow-auto p-3">
-      <n-grid :cols="2" :x-gap="12" :y-gap="12" responsive="screen">
-        <n-card v-for="(city, index) in cities" :key="city.name" size="small" class="relative">
-          <div class="flex justify-between items-start">
-            <div>
-              <div class="text-lg font-bold">{{ city.name }}</div>
-              <div class="text-xs text-gray-500">{{ city.offset }}</div>
+      <n-empty v-if="cities.length === 0" description="暂无城市，从上方添加" class="mt-10" />
+      <n-grid v-else :cols="2" :x-gap="12" :y-gap="12" responsive="screen">
+        <n-gi v-for="(city, index) in cities" :key="city.name">
+          <n-card size="small" class="relative">
+            <div class="flex justify-between items-start">
+              <div>
+                <div class="text-lg font-bold">{{ city.name }}</div>
+                <div class="text-xs text-gray-500">{{ city.offset }}</div>
+              </div>
+              <n-button circle size="tiny" quaternary type="error" @click="onRemoveCity(index)">
+                <template #icon>
+                  <n-icon size="14"><CloseIcon /></n-icon>
+                </template>
+              </n-button>
             </div>
-            <n-button circle size="tiny" quaternary type="error" @click="onRemoveCity(index)">
-              <template #icon>
-                <n-icon size="14"><CloseIcon /></n-icon>
-              </template>
-            </n-button>
-          </div>
-          <div class="mt-4 text-2xl font-bold tabular-nums">{{ getTime(city.offset) }}</div>
-          <div class="text-sm text-gray-500">{{ getDate(city.offset) }}</div>
-        </n-card>
+            <div class="mt-4 text-2xl font-bold tabular-nums">{{ getTime(city.offset) }}</div>
+            <div class="text-sm text-gray-500">{{ getDate(city.offset) }}</div>
+          </n-card>
+        </n-gi>
       </n-grid>
     </div>
-  </div>
+  </ToolPage>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from "vue";
-import { NButton, NCard, NGrid, NTag, NSelect, NIcon, useMessage } from "naive-ui";
+import { NButton, NCard, NGrid, NGi, NTag, NSelect, NIcon, NEmpty, useMessage } from "naive-ui";
+import ToolPage from "@/components/tool/ToolPage.vue";
+import ToolToolbar from "@/components/tool/ToolToolbar.vue";
 import { Close as CloseIcon } from "@vicons/ionicons5";
 
 interface City {

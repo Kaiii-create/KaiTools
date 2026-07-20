@@ -1,5 +1,5 @@
 <template>
-  <div class="color-tool flex flex-col h-full">
+  <ToolPage>
     <!-- 预览区 + 拾色器 -->
     <div class="preview-section flex items-center gap-4 px-4 py-3 bg-gray-50 dark:bg-gray-800">
       <div
@@ -88,11 +88,12 @@
         </n-card>
       </n-space>
     </div>
-  </div>
+  </ToolPage>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
+import ToolPage from "@/components/tool/ToolPage.vue";
 import { NCard, NSpace, NInput, NInputNumber, NButton, NIcon, useMessage } from "naive-ui";
 import { ColorPaletteOutline as ColorPickerIcon } from "@vicons/ionicons5";
 

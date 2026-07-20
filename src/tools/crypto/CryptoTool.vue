@@ -1,11 +1,11 @@
 <template>
-  <div class="crypto-tool flex flex-col h-full">
+  <ToolPage>
     <!-- 工具栏 -->
-    <div class="toolbar flex items-center gap-2 px-3 py-2 border-b border-gray-200 dark:border-gray-700">
+    <ToolToolbar>
       <n-select v-model:value="mode" :options="modes" size="small" style="width: 150px" />
       <n-button type="primary" size="small" @click="onExecute">执行</n-button>
       <n-button quaternary size="small" @click="onClear">清空</n-button>
-    </div>
+    </ToolToolbar>
 
     <!-- 内容区 -->
     <div class="flex-1 overflow-auto p-3">
@@ -62,12 +62,14 @@
         </n-card>
       </n-space>
     </div>
-  </div>
+  </ToolPage>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import { NButton, NInput, NSelect, NCard, NSpace, NInputNumber, NSwitch, useMessage } from "naive-ui";
+import ToolPage from "@/components/tool/ToolPage.vue";
+import ToolToolbar from "@/components/tool/ToolToolbar.vue";
 import CryptoJS from "crypto-js";
 
 const message = useMessage();

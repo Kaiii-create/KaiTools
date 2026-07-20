@@ -1,33 +1,33 @@
 <template>
-  <div class="timestamp flex flex-col h-full">
-    <div class="toolbar flex items-center gap-2 px-3 py-2 border-b border-gray-200 dark:border-gray-700">
+  <ToolPage>
+    <ToolToolbar>
       <n-button size="small" @click="refreshNow">刷新当前时间</n-button>
       <div class="flex-1" />
       <n-tag size="small" round type="info">实时：{{ currentIso }}</n-tag>
-    </div>
+    </ToolToolbar>
 
-    <div class="flex-1 overflow-y-auto p-3 space-y-4">
+    <div class="flex-1 min-h-0 space-y-4">
       <!-- 当前时间显示 -->
       <n-card title="当前时间" size="small">
         <div class="grid grid-cols-2 gap-3 text-sm">
           <div class="copyable" @click="onCopy(currentTs, '时间戳(秒)')">
-            <span class="text-gray-500">时间戳(秒)：</span>{{ currentTs }}
+            <span class="text-[var(--ktool-text-mute)]">时间戳(秒)：</span>{{ currentTs }}
             <n-icon class="copy-icon"><CopyIcon /></n-icon>
           </div>
           <div class="copyable" @click="onCopy(currentTsMs, '时间戳(毫秒)')">
-            <span class="text-gray-500">时间戳(毫秒)：</span>{{ currentTsMs }}
+            <span class="text-[var(--ktool-text-mute)]">时间戳(毫秒)：</span>{{ currentTsMs }}
             <n-icon class="copy-icon"><CopyIcon /></n-icon>
           </div>
           <div class="copyable" @click="onCopy(currentLocal, '本地时间')">
-            <span class="text-gray-500">本地：</span>{{ currentLocal }}
+            <span class="text-[var(--ktool-text-mute)]">本地：</span>{{ currentLocal }}
             <n-icon class="copy-icon"><CopyIcon /></n-icon>
           </div>
           <div class="copyable" @click="onCopy(currentUtc, 'UTC')">
-            <span class="text-gray-500">UTC：</span>{{ currentUtc }}
+            <span class="text-[var(--ktool-text-mute)]">UTC：</span>{{ currentUtc }}
             <n-icon class="copy-icon"><CopyIcon /></n-icon>
           </div>
           <div class="copyable col-span-2" @click="onCopy(currentIso, 'ISO')">
-            <span class="text-gray-500">ISO：</span>{{ currentIso }}
+            <span class="text-[var(--ktool-text-mute)]">ISO：</span>{{ currentIso }}
             <n-icon class="copy-icon"><CopyIcon /></n-icon>
           </div>
         </div>
@@ -50,12 +50,12 @@
             class="copyable"
             @click="onCopy(line.value, line.label)"
           >
-            <span class="text-gray-500">{{ line.label }}：</span>{{ line.value }}
+            <span class="text-[var(--ktool-text-mute)]">{{ line.label }}：</span>{{ line.value }}
             <n-icon class="copy-icon"><CopyIcon /></n-icon>
           </div>
         </div>
-        <div v-else-if="tsError" class="text-red-500 text-sm">{{ tsError }}</div>
-        <div v-else class="text-gray-400 text-sm">输入时间戳后自动转换</div>
+        <div v-else-if="tsError" class="text-[var(--ktool-danger)] text-sm">{{ tsError }}</div>
+        <div v-else class="text-[var(--ktool-text-mute)] text-sm">输入时间戳后自动转换</div>
       </n-card>
 
       <!-- 日期 → 时间戳 -->
@@ -70,19 +70,21 @@
             class="copyable"
             @click="onCopy(line.value, line.label)"
           >
-            <span class="text-gray-500">{{ line.label }}：</span>{{ line.value }}
+            <span class="text-[var(--ktool-text-mute)]">{{ line.label }}：</span>{{ line.value }}
             <n-icon class="copy-icon"><CopyIcon /></n-icon>
           </div>
         </div>
-        <div v-else class="text-gray-400 text-sm">选择日期后自动转换</div>
+        <div v-else class="text-[var(--ktool-text-mute)] text-sm">选择日期后自动转换</div>
       </n-card>
     </div>
-  </div>
+  </ToolPage>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from "vue";
 import { NButton, NInput, NCard, NTag, NIcon, NRadioGroup, NRadioButton, NDatePicker, useMessage } from "naive-ui";
+import ToolPage from "@/components/tool/ToolPage.vue";
+import ToolToolbar from "@/components/tool/ToolToolbar.vue";
 import { CopyOutline as CopyIcon } from "@vicons/ionicons5";
 
 interface Line { label: string; value: string }
@@ -172,13 +174,13 @@ onUnmounted(() => { if (timer) clearInterval(timer); });
   gap: 4px;
 }
 .copyable:hover {
-  background: rgba(59, 130, 246, 0.1);
+  background: var(--ktool-brand-soft);
 }
 .copy-icon {
   opacity: 0;
   transition: opacity 0.2s;
   font-size: 14px;
-  color: #3b82f6;
+  color: var(--ktool-brand);
 }
 .copyable:hover .copy-icon {
   opacity: 1;

@@ -49,6 +49,9 @@ import prettier from "prettier/standalone";
 import parserHtml from "prettier/plugins/html";
 import parserCss from "prettier/plugins/postcss";
 import parserBabel from "prettier/plugins/babel";
+import parserTypescript from "prettier/plugins/typescript";
+import parserMarkdown from "prettier/plugins/markdown";
+import parserYaml from "prettier/plugins/yaml";
 
 const message = useMessage();
 
@@ -61,16 +64,38 @@ const statusType = ref<"success" | "error" | "default">("default");
 const languages = [
   { label: "HTML", value: "html" },
   { label: "CSS", value: "css" },
+  { label: "SCSS", value: "scss" },
+  { label: "Less", value: "less" },
   { label: "JavaScript", value: "javascript" },
+  { label: "TypeScript", value: "typescript" },
+  { label: "JSON", value: "json" },
+  { label: "Markdown", value: "markdown" },
+  { label: "YAML", value: "yaml" },
 ];
 
+const plugins = [
+  parserHtml,
+  parserCss,
+  parserBabel,
+  parserTypescript,
+  parserMarkdown,
+  parserYaml,
+];
+
+const parserMap: Record<string, string> = {
+  html: "html",
+  css: "css",
+  scss: "scss",
+  less: "less",
+  javascript: "babel",
+  typescript: "typescript",
+  json: "json",
+  markdown: "markdown",
+  yaml: "yaml",
+};
+
 function getParser(lang: string): string {
-  switch (lang) {
-    case "html": return "html";
-    case "css": return "css";
-    case "javascript": return "babel";
-    default: return "html";
-  }
+  return parserMap[lang] ?? "babel";
 }
 
 async function onFormat() {
@@ -81,7 +106,7 @@ async function onFormat() {
   try {
     output.value = await prettier.format(input.value, {
       parser: getParser(language.value),
-      plugins: [parserHtml, parserCss, parserBabel],
+      plugins,
       semi: true,
       singleQuote: true,
       tabWidth: 2,
@@ -102,15 +127,19 @@ async function onMinify() {
     return;
   }
   try {
-    output.value = await prettier.format(input.value, {
-      parser: getParser(language.value),
-      plugins: [parserHtml, parserCss, parserBabel],
-      semi: true,
-      singleQuote: true,
-      tabWidth: 0,
-      printWidth: 10000,
-    });
-    output.value = output.value.replace(/\s+/g, " ");
+    // JSON 直接 parse/stringify 得到单行压缩结果
+    if (language.value === "json") {
+      output.value = JSON.stringify(JSON.parse(input.value));
+    } else {
+      output.value = await prettier.format(input.value, {
+        parser: getParser(language.value),
+        plugins,
+        semi: true,
+        singleQuote: true,
+        tabWidth: 0,
+        printWidth: 10000,
+      });
+    }
     status.value = "压缩成功";
     statusType.value = "success";
   } catch (e) {

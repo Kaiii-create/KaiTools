@@ -1,97 +1,89 @@
 <template>
-  <div class="json-formatter flex flex-col h-full">
-    <!-- 工具栏 -->
-    <div class="toolbar flex items-center gap-2 px-3 py-2 border-b border-gray-200 dark:border-gray-700">
-      <n-select
-        v-model:value="indent"
-        :options="indentOptions"
-        size="small"
-        style="width: 110px"
-      />
-      <n-button size="small" type="primary" @click="onFormat">格式化</n-button>
-      <n-button size="small" @click="onMinify">压缩</n-button>
-      <n-button size="small" @click="onValidate">校验</n-button>
-      <n-divider vertical />
-      <n-button size="small" quaternary @click="onSwap" :disabled="!output">↑↓ 交换</n-button>
-      <n-button size="small" quaternary @click="onCopyOutput" :disabled="!output">
-        复制结果
-      </n-button>
-      <n-button size="small" quaternary @click="onClear">清空</n-button>
-      <div class="flex-1" />
-      <n-switch v-model:value="autoFormat" size="small">
-        <template #checked>自动</template>
-        <template #unchecked>自动</template>
-      </n-switch>
-      <n-tag v-if="status" :type="statusType" size="small" round>
-        {{ status }}
-      </n-tag>
-    </div>
+  <ToolPage class="json-page">
+    <div class="json-stack">
+      <ToolPanel title="输入" bordered flush class="json-panel">
+        <template #header-extra>
+          <div class="json-header-actions">
+            <n-button text size="tiny" @click="pasteInput">粘贴</n-button>
+            <n-button text size="tiny" :disabled="!input" @click="clearInput">清空</n-button>
+          </div>
+        </template>
 
-    <!-- 输入/输出区 -->
-    <div class="flex-1 grid grid-cols-2 gap-2 p-2 min-h-0">
-      <div class="flex flex-col min-h-0">
-        <div class="text-xs text-gray-500 mb-1 px-1">输入</div>
-        <n-input
-          v-model:value="input"
-          type="textarea"
-          placeholder='粘贴 JSON，自动格式化。例如 {"name":"ktool","version":1}'
-          :autofocus="true"
-          class="flex-1"
-          style="height: 100%"
-          round
+        <EditorPane
+          v-model="input"
+          mono
+          line-numbers
+          placeholder='在此粘贴 JSON，例如 {"name":"KTool","version":1}'
         />
-      </div>
-      <div class="flex flex-col min-h-0">
-        <div class="text-xs text-gray-500 mb-1 px-1">输出</div>
-        <n-input
-          v-model:value="output"
-          type="textarea"
-          placeholder="格式化结果将显示在这里"
+
+        <ToolToolbar :bordered="false" class="json-toolbar">
+          <n-switch v-model:value="autoFormat" size="small">
+            <template #checked>自动格式化</template>
+            <template #unchecked>自动格式化</template>
+          </n-switch>
+
+          <template #side>
+            <n-select
+              v-model:value="indent"
+              :options="indentOptions"
+              size="small"
+              class="indent-select"
+            />
+            <n-button size="small" @click="onValidate">校验</n-button>
+            <n-button size="small" @click="onMinify">压缩</n-button>
+            <n-button size="small" type="primary" @click="onFormat">格式化</n-button>
+          </template>
+        </ToolToolbar>
+      </ToolPanel>
+
+      <ToolPanel title="输出" bordered flush class="json-panel">
+        <template #header-extra>
+          <div class="json-header-actions">
+            <n-button text size="tiny" :disabled="!output" @click="onSwap">交换到输入</n-button>
+            <n-button text size="tiny" :disabled="!output" @click="onCopyOutput">复制结果</n-button>
+          </div>
+        </template>
+
+        <EditorPane
+          v-model="output"
           readonly
-          class="flex-1"
-          style="height: 100%"
-          round
+          mono
+          line-numbers
+          placeholder="格式化结果将显示在这里…"
         />
-      </div>
+      </ToolPanel>
     </div>
 
-    <!-- 错误提示 -->
-    <n-alert
-      v-if="errorMsg"
-      type="error"
-      :title="`解析失败`"
-      class="mx-2 mb-2"
-      closable
-      @close="errorMsg = ''"
-    >
-      {{ errorMsg }}
-    </n-alert>
-  </div>
+    <StatusBar :tone="statusTone" class="json-status" :title="errorMsg || status">
+      {{ errorMsg || status || "等待输入" }}
+      <template #right>
+        <span>行数 {{ outputLineCount }}</span>
+        <span>输入 {{ input.length }} 字符</span>
+        <span>输出 {{ output.length }} 字符</span>
+      </template>
+    </StatusBar>
+  </ToolPage>
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from "vue";
-import {
-  NButton,
-  NInput,
-  NSelect,
-  NTag,
-  NDivider,
-  NAlert,
-  NSwitch,
-  useMessage,
-} from "naive-ui";
+import { computed, ref, watch } from "vue";
+import { NButton, NSelect, NSwitch, useMessage } from "naive-ui";
 import { formatJson, minifyJson, validateJson } from "@/api/json";
 import { useHistoryStore } from "@/stores/history";
+import ToolPage from "@/components/tool/ToolPage.vue";
+import ToolPanel from "@/components/tool/ToolPanel.vue";
+import ToolToolbar from "@/components/tool/ToolToolbar.vue";
+import EditorPane from "@/components/tool/EditorPane.vue";
+import StatusBar from "@/components/tool/StatusBar.vue";
 
 const message = useMessage();
 const historyStore = useHistoryStore();
 
 const indent = ref<2 | 4 | 8>(2);
 const indentOptions = [
-  { label: "2 空格", value: 2 },
-  { label: "4 空格", value: 4 },
-  { label: "Tab", value: 8 },
+  { label: "缩进 2 空格", value: 2 },
+  { label: "缩进 4 空格", value: 4 },
+  { label: "Tab 缩进", value: 8 },
 ];
 
 const input = ref("");
@@ -100,17 +92,17 @@ const errorMsg = ref("");
 const status = ref("");
 const statusType = ref<"default" | "success" | "error">("default");
 const autoFormat = ref(true);
-
-// 防抖
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+let lastHistoryTime = 0;
+let lastHistoryInput = "";
 
-// 自动格式化：输入变化或缩进变化时触发
+const outputLineCount = computed(() => (output.value ? output.value.split("\n").length : 0));
+const statusTone = computed<"default" | "success" | "error">(() => statusType.value);
+
 watch([input, indent, autoFormat], () => {
   if (!autoFormat.value) return;
   if (debounceTimer) clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(() => {
-    runFormat(true);
-  }, 300);
+  debounceTimer = setTimeout(() => runFormat(true), 300);
 });
 
 async function runFormat(silent = false) {
@@ -118,15 +110,17 @@ async function runFormat(silent = false) {
     output.value = "";
     errorMsg.value = "";
     status.value = "";
+    statusType.value = "default";
     return;
   }
+
   const res = await formatJson(input.value, indent.value);
   if (res.success) {
     output.value = res.data;
     errorMsg.value = "";
     status.value = silent ? "已格式化" : "格式化成功";
     statusType.value = "success";
-    // 记录到历史（节流：同一输入 5 秒内不重复记录）
+
     const now = Date.now();
     if (now - lastHistoryTime > 5000 && input.value !== lastHistoryInput) {
       historyStore.add({
@@ -140,15 +134,11 @@ async function runFormat(silent = false) {
       lastHistoryInput = input.value;
     }
   } else {
-    // 静默模式下不弹错误提示，只在状态栏显示
     errorMsg.value = silent ? "" : res.error;
     status.value = "语法错误";
     statusType.value = "error";
   }
 }
-
-let lastHistoryTime = 0;
-let lastHistoryInput = "";
 
 async function onFormat() {
   if (!input.value.trim()) {
@@ -171,7 +161,7 @@ async function onMinify() {
     statusType.value = "success";
   } else {
     errorMsg.value = res.error;
-    status.value = "失败";
+    status.value = "压缩失败";
     statusType.value = "error";
   }
 }
@@ -200,7 +190,8 @@ function onSwap() {
   if (!output.value) return;
   input.value = output.value;
   output.value = "";
-  status.value = "";
+  status.value = "已交换到输入";
+  statusType.value = "default";
 }
 
 async function onCopyOutput() {
@@ -213,16 +204,82 @@ async function onCopyOutput() {
   }
 }
 
-function onClear() {
+async function pasteInput() {
+  try {
+    input.value = await navigator.clipboard.readText();
+  } catch {
+    message.error("无法读取剪贴板");
+  }
+}
+
+function clearInput() {
   input.value = "";
   output.value = "";
   errorMsg.value = "";
   status.value = "";
+  statusType.value = "default";
 }
 </script>
 
 <style scoped>
-.json-formatter {
-  background: transparent;
+.json-page {
+  overflow: hidden;
+}
+.json-page :deep(.tool-page-inner) {
+  height: 100%;
+  min-height: 0;
+  padding: 12px 16px;
+}
+.json-stack {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(170px, 1fr) minmax(170px, 1fr);
+  gap: 10px;
+}
+.json-panel {
+  background: var(--ktool-surface);
+  box-shadow: var(--ktool-shadow-sm);
+}
+.json-panel :deep(.tool-panel-head) {
+  min-height: 40px;
+  padding: 7px 12px;
+}
+.json-panel :deep(.tool-panel-body) {
+  display: flex;
+  flex-direction: column;
+}
+.json-panel :deep(.editor-pane-body) {
+  border-radius: 0;
+}
+.json-toolbar {
+  min-height: 46px;
+  padding: 7px 10px;
+  border-top: 1px solid var(--ktool-border);
+}
+.json-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.indent-select {
+  width: 126px;
+}
+.json-status {
+  margin-top: 10px;
+  border: 1px solid var(--ktool-border);
+  border-radius: var(--ktool-radius-sm);
+}
+
+@media (max-width: 980px) {
+  .json-page :deep(.tool-page-inner) {
+    padding-inline: 12px;
+  }
+  .json-toolbar :deep(.tool-toolbar-main) {
+    display: none;
+  }
+  .json-status :deep(.status-bar-right span:first-child) {
+    display: none;
+  }
 }
 </style>

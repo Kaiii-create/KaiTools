@@ -2,12 +2,12 @@
   <div class="qrcode flex h-full">
     <!-- 左侧：输入 + 配置 -->
     <div class="left-panel w-[340px] flex flex-col border-r border-gray-200 dark:border-gray-700">
-      <div class="toolbar flex items-center gap-2 px-3 py-2 border-b border-gray-200 dark:border-gray-700">
+      <ToolToolbar>
         <n-button size="small" type="primary" :disabled="!input" @click="onDownload">下载 PNG</n-button>
         <n-button size="small" quaternary @click="onClear">清空</n-button>
         <div class="flex-1" />
         <n-tag size="small" round type="info">实时预览</n-tag>
-      </div>
+      </ToolToolbar>
 
       <div class="flex-1 overflow-y-auto p-3">
         <n-space vertical :size="16">
@@ -166,7 +166,9 @@ import {
   NButton, NInput, NCard, NSpace, NSlider, NSelect, NColorPicker,
   NSwitch, NRadioGroup, NRadioButton, NTag, NAlert, NText, useMessage,
 } from "naive-ui";
+import ToolToolbar from "@/components/tool/ToolToolbar.vue";
 import { drawQrcode, type QrOptions, type DotStyle, type EyeStyle, type ErrorLevel } from "./draw";
+import { downloadFile, canvasToBlob } from "@/lib/download";
 
 const message = useMessage();
 
@@ -254,16 +256,18 @@ function onLogoClear() {
   opts.logo = null;
 }
 
-function onDownload() {
+async function onDownload() {
   if (!canvasRef.value || !input.value) {
     message.warning("没有可下载的二维码");
     return;
   }
-  const link = document.createElement("a");
-  link.download = `qrcode-${Date.now()}.png`;
-  link.href = canvasRef.value.toDataURL("image/png");
-  link.click();
-  message.success("已下载");
+  try {
+    const blob = await canvasToBlob(canvasRef.value, "image/png");
+    const path = await downloadFile(`qrcode-${Date.now()}.png`, blob);
+    message.success(`已下载到 ${path}`);
+  } catch (e) {
+    message.error((e as Error).message || "下载失败");
+  }
 }
 
 function onClear() {

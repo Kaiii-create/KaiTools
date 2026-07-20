@@ -1,12 +1,12 @@
 <template>
-  <div class="http-requester flex flex-col h-full">
+  <ToolPage>
     <!-- 顶部工具栏 -->
-    <div class="toolbar flex items-center gap-2 px-3 py-2 border-b border-gray-200 dark:border-gray-700">
+    <ToolToolbar>
       <n-select v-model:value="method" :options="methods" size="small" style="width: 100px" />
       <n-input v-model:value="url" placeholder="输入请求 URL（如 https://httpbin.org/get）" class="flex-1" @keydown.enter="onSend" />
       <n-button type="primary" size="small" :loading="loading" @click="onSend">发送</n-button>
       <n-button quaternary size="small" @click="onClear">清空</n-button>
-    </div>
+    </ToolToolbar>
 
     <!-- 中间配置区 -->
     <div class="config-panel border-b border-gray-200 dark:border-gray-700">
@@ -73,12 +73,14 @@
         />
       </div>
     </div>
-  </div>
+  </ToolPage>
 </template>
 
 <script setup lang="ts">
 import { ref } from "vue";
 import { NButton, NInput, NSelect, NTabs, NTabPane, NTag, useMessage } from "naive-ui";
+import ToolPage from "@/components/tool/ToolPage.vue";
+import ToolToolbar from "@/components/tool/ToolToolbar.vue";
 
 const message = useMessage();
 
@@ -134,15 +136,37 @@ function getResponseType(code: string): "success" | "warning" | "error" | "defau
   return "default";
 }
 
+// 归一化 URL：去除首尾空白/不可见字符，转换全角冒号与斜杠，缺省协议时补 https://
+function normalizeUrl(raw: string): string {
+  let u = raw
+    .replace(/[\u200B-\u200D\uFEFF]/g, "") // 零宽字符
+    .trim();
+  // 全角字符转半角（冒号、斜杠、字母数字常见误输入）
+  u = u
+    .replace(/：/g, ":")
+    .replace(/／/g, "/")
+    .replace(/[\uFF01-\uFF5E]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0));
+  // 去掉中间的换行/多余空白
+  u = u.replace(/\s+/g, "");
+  // 若没有协议，默认补 https://
+  if (u && !/^https?:\/\//i.test(u)) {
+    u = "https://" + u;
+  }
+  return u;
+}
+
 async function onSend() {
-  if (!url.value.trim()) {
+  const normalized = normalizeUrl(url.value);
+  if (!normalized) {
     message.warning("请输入请求 URL");
     return;
   }
-  if (!url.value.startsWith("http://") && !url.value.startsWith("https://")) {
+  if (!/^https?:\/\//i.test(normalized)) {
     message.warning("URL 必须以 http:// 或 https:// 开头");
     return;
   }
+  // 回填归一化后的 URL，方便用户看到实际请求地址
+  url.value = normalized;
 
   loading.value = true;
   response.value = "";
