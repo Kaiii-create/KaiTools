@@ -1,6 +1,6 @@
 <template>
-  <div class="tool-page h-full overflow-auto ktool-scroll">
-    <div class="tool-page-inner" :class="padded ? 'p-4' : ''">
+  <div class="tool-page h-full flex flex-col">
+    <div class="tool-page-inner ktool-scroll" :class="padded ? 'p-4' : ''">
       <slot />
     </div>
   </div>
@@ -19,8 +19,11 @@ withDefaults(
 
 <style scoped>
 .tool-page-inner {
-  min-height: 100%;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 </style>

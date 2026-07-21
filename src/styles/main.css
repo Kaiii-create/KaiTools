@@ -24,7 +24,6 @@
   /* —— 浅色背景层次（中性灰） —— */
   --ktool-bg: #f6f7f9;
   --ktool-windowbar: #f7f7f8;
-  --ktool-window-border: rgba(20, 24, 32, 0.18);
   --ktool-surface: #ffffff;
   --ktool-surface-2: #f1f2f5;
   --ktool-surface-3: #e9ebef;
@@ -70,7 +69,6 @@
   /* —— 深色背景层次（非纯黑） —— */
   --ktool-bg: #0e1014;
   --ktool-windowbar: #17191e;
-  --ktool-window-border: rgba(255, 255, 255, 0.13);
   --ktool-surface: #16181d;
   --ktool-surface-2: #1b1e24;
   --ktool-surface-3: #23272f;
@@ -113,6 +111,13 @@ body,
 html.kbd-widget-mode,
 html.kbd-widget-mode body,
 html.kbd-widget-mode #app {
+  background: transparent !important;
+}
+
+/* 屏幕取色 overlay 模式：透明背景 */
+html.color-picker-mode,
+html.color-picker-mode body,
+html.color-picker-mode #app {
   background: transparent !important;
 }
 
@@ -179,4 +184,17 @@ html.kbd-widget-mode #app {
   outline: 2px solid var(--ktool-brand);
   outline-offset: 1px;
   border-radius: var(--ktool-radius-sm);
+}
+
+/* HTTP 请求：URL 输入框铺满工具栏 */
+.http-toolbar .tool-toolbar-main {
+  flex: 1 1 0%;
+  min-width: 0;
+}
+.http-toolbar > .flex-1 {
+  display: none;
+}
+.http-toolbar .tool-toolbar-main .n-input {
+  flex: 1 1 auto;
+  min-width: 0;
 }

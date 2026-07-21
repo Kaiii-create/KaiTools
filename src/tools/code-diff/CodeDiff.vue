@@ -90,7 +90,13 @@ const diffParts = computed<{ type: "add" | "del" | "same"; text: string }[]>(() 
   let raw: [number, string][];
   if (mode.value === "line") {
     const tmp = dmp.diff_linesToChars_(leftText.value, rightText.value);
-    raw = dmp.diff_charsToLines_(tmp);
+    raw = dmp.diff_main(tmp.chars1, tmp.chars2, false);
+    dmp.diff_cleanupSemantic(raw);
+    // 注意：@types 将该方法声明为单参数，但运行时需要 lineArray
+    (dmp.diff_charsToLines_ as unknown as (diffs: [number, string][], lineArray: string[]) => void)(
+      raw,
+      tmp.lineArray
+    );
   } else {
     raw = dmp.diff_main(leftText.value, rightText.value);
     dmp.diff_cleanupSemantic(raw);

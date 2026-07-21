@@ -52,7 +52,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import WindowChrome from "@/components/WindowChrome.vue";
 import Sidebar from "@/components/Sidebar.vue";
 import TitleBar from "@/components/TitleBar.vue";
@@ -61,10 +61,16 @@ import CommandPalette from "@/components/CommandPalette.vue";
 import SettingsModal from "@/components/SettingsModal.vue";
 import { tools } from "@/tools/registry";
 import { useHistoryStore } from "@/stores/history";
+import type { HistoryItem } from "@/stores/history";
 import { useNavStore } from "@/stores/nav";
+import { useSettingsStore } from "@/stores/settings";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { openColorPicker } from "@/lib/picker";
+import { invoke } from "@tauri-apps/api/core";
 
 const historyStore = useHistoryStore();
 const navStore = useNavStore();
+const settings = useSettingsStore();
 
 const activeToolId = ref<string>(tools[0].id);
 const showHistory = ref(false);
@@ -77,9 +83,15 @@ const activeTool = computed(
   () => tools.find((t) => t.id === activeToolId.value) ?? tools[0]
 );
 
-function onSelect(id: string) {
-  activeToolId.value = id;
-  navStore.touchRecent(id);
+function onSelect(payload: string | HistoryItem) {
+  if (typeof payload === "string") {
+    activeToolId.value = payload;
+    navStore.touchRecent(payload);
+  } else {
+    activeToolId.value = payload.toolId;
+    navStore.touchRecent(payload.toolId);
+    historyStore.requestRestore(payload);
+  }
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -92,10 +104,35 @@ function onKeydown(e: KeyboardEvent) {
 onMounted(() => {
   window.addEventListener("keydown", onKeydown);
   navStore.touchRecent(activeToolId.value);
+  // 把当前取色快捷键交给 Rust 端统一注册（安全，不会因冲突崩溃）
+  applyPickerShortcut(settings.data.pickerShortcut);
+  // 把关闭行为同步给 Rust（影响 Alt+F4 等系统级关闭）
+  applyCloseMode(settings.data.closeBehavior);
+  // 监听 Rust 端全局快捷键触发的取色事件
+  getCurrentWindow()
+    .listen("open-color-picker", () => openColorPicker())
+    .catch(() => {});
 });
-onUnmounted(() => {
-  window.removeEventListener("keydown", onKeydown);
-});
+
+// 屏幕取色全局快捷键：随设置变化交给 Rust 端重注册
+async function applyPickerShortcut(shortcut: string) {
+  try {
+    await invoke("set_picker_shortcut", { shortcut });
+  } catch (e) {
+    console.warn("[picker] 取色快捷键设置失败：", e);
+  }
+}
+watch(() => settings.data.pickerShortcut, (s) => applyPickerShortcut(s));
+
+// 关闭行为：同步给 Rust（系统级关闭尊重设置）
+async function applyCloseMode(mode: string) {
+  try {
+    await invoke("set_close_mode", { mode });
+  } catch (e) {
+    console.warn("[close] 关闭模式设置失败：", e);
+  }
+}
+watch(() => settings.data.closeBehavior, (m) => applyCloseMode(m));
 </script>
 
 <style scoped>
@@ -106,9 +143,9 @@ onUnmounted(() => {
   flex-direction: column;
   overflow: hidden;
   background: var(--ktool-bg);
-  border: 1px solid var(--ktool-window-border);
+  border: 0;
   border-radius: 10px;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+  box-shadow: none;
 }
 .window-frame--maximized {
   border: 0;
@@ -122,6 +159,6 @@ onUnmounted(() => {
   background: var(--ktool-bg);
 }
 .app-workspace {
-  background: var(--ktool-bg);
+  background: var(--ktool-surface);
 }
 </style>

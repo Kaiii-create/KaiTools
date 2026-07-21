@@ -7,6 +7,7 @@ export const codeDiff: ToolModule = {
   name: "代码对比",
   description: "对比两段文本/代码的差异",
   icon: GitCompareOutline,
+  accent: "#10b981",
   category: "编码",
   keywords: ["diff", "compare", "对比", "差异", "比较"],
   component: CodeDiff,

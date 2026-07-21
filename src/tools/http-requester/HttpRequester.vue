@@ -1,7 +1,7 @@
 <template>
   <ToolPage>
     <!-- 顶部工具栏 -->
-    <ToolToolbar>
+    <ToolToolbar class="http-toolbar">
       <n-select v-model:value="method" :options="methods" size="small" style="width: 100px" />
       <n-input v-model:value="url" placeholder="输入请求 URL（如 https://httpbin.org/get）" class="flex-1" @keydown.enter="onSend" />
       <n-button type="primary" size="small" :loading="loading" @click="onSend">发送</n-button>
@@ -44,6 +44,10 @@
       <div class="response-header flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-800">
         <div class="flex items-center gap-2">
           <span class="text-sm font-medium">响应结果</span>
+          <n-radio-group v-model:value="responseView" size="small" type="button">
+            <n-radio-button value="pretty">美化响应</n-radio-button>
+            <n-radio-button value="raw">原始响应</n-radio-button>
+          </n-radio-group>
           <n-tag v-if="responseCode" :type="getResponseType(responseCode)" size="small">
             {{ responseCode }}
           </n-tag>
@@ -53,7 +57,7 @@
           </n-button>
         </div>
         <div class="flex items-center gap-2">
-          <n-button quaternary size="small" @click="onCopyResponse" :disabled="!response">复制</n-button>
+          <n-button quaternary size="small" @click="onCopyResponse" :disabled="!displayResponse">复制</n-button>
         </div>
       </div>
       <div v-if="showHeaders && responseHeaders.size" class="px-3 py-2 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 text-xs max-h-40 overflow-auto">
@@ -62,14 +66,13 @@
           <span class="font-mono">{{ v }}</span>
         </div>
       </div>
-      <div class="response-body flex-1 p-3 overflow-auto">
-        <n-input
-          v-model:value="response"
-          type="textarea"
+      <div class="response-body flex-1 min-h-0 p-3">
+        <EditorPane
+          :model-value="displayResponse"
           readonly
+          mono
           :placeholder="loading ? '请求中...' : '响应结果将显示在这里'"
           class="h-full"
-          :style="{ fontFamily: 'monospace' }"
         />
       </div>
     </div>
@@ -77,10 +80,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
-import { NButton, NInput, NSelect, NTabs, NTabPane, NTag, useMessage } from "naive-ui";
+import { ref, computed } from "vue";
+import { NButton, NInput, NRadioGroup, NRadioButton, NSelect, NTabs, NTabPane, NTag, useMessage } from "naive-ui";
 import ToolPage from "@/components/tool/ToolPage.vue";
 import ToolToolbar from "@/components/tool/ToolToolbar.vue";
+import EditorPane from "@/components/tool/EditorPane.vue";
 
 const message = useMessage();
 
@@ -91,7 +95,10 @@ const cookies = ref("");
 const body = ref("");
 const contentType = ref("application/json");
 const activeTab = ref("headers");
-const response = ref("");
+const rawBody = ref("");
+const prettyBody = ref("");
+const responseView = ref<"pretty" | "raw">("pretty");
+const displayResponse = computed(() => (responseView.value === "pretty" ? prettyBody.value : rawBody.value));
 const responseCode = ref("");
 const responseTime = ref(0);
 const responseHeaders = ref<Map<string, string>>(new Map());
@@ -169,7 +176,9 @@ async function onSend() {
   url.value = normalized;
 
   loading.value = true;
-  response.value = "";
+  rawBody.value = "";
+  prettyBody.value = "";
+  responseView.value = "pretty";
   responseCode.value = "";
   responseTime.value = 0;
   responseHeaders.value = new Map();
@@ -201,7 +210,8 @@ async function onSend() {
     });
 
     if (res.error) {
-      response.value = `请求失败：${res.error}`;
+      rawBody.value = `请求失败：${res.error}`;
+      prettyBody.value = rawBody.value;
       message.error("请求失败");
     } else {
       responseCode.value = String(res.status);
@@ -211,16 +221,18 @@ async function onSend() {
         headersMap.set(k, v);
       }
       responseHeaders.value = headersMap;
-      // 尝试格式化 JSON
+      rawBody.value = res.body;
+      // 美化：尝试格式化 JSON，失败则保留原始文本
       try {
-        response.value = JSON.stringify(JSON.parse(res.body), null, 2);
+        prettyBody.value = JSON.stringify(JSON.parse(res.body), null, 2);
       } catch {
-        response.value = res.body;
+        prettyBody.value = res.body;
       }
       message.success(`请求完成 ${res.status}`);
     }
   } catch (e) {
-    response.value = `调用失败：${(e as Error).message}`;
+    rawBody.value = `调用失败：${(e as Error).message}`;
+    prettyBody.value = rawBody.value;
     message.error("调用失败");
   } finally {
     loading.value = false;
@@ -228,9 +240,9 @@ async function onSend() {
 }
 
 async function onCopyResponse() {
-  if (!response.value) return;
+  if (!displayResponse.value) return;
   try {
-    await navigator.clipboard.writeText(response.value);
+    await navigator.clipboard.writeText(displayResponse.value);
     message.success("已复制");
   } catch {
     message.error("复制失败");
@@ -242,7 +254,9 @@ function onClear() {
   headers.value = "";
   cookies.value = "";
   body.value = "";
-  response.value = "";
+  rawBody.value = "";
+  prettyBody.value = "";
+  responseView.value = "pretty";
   responseCode.value = "";
   responseTime.value = 0;
   responseHeaders.value = new Map();

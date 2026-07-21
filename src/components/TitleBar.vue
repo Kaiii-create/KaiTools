@@ -4,7 +4,8 @@
       <n-icon
         v-if="tool"
         :component="tool.icon"
-        :size="18"
+        :size="20"
+        :style="{ color: tool.accent || 'var(--ktool-brand)' }"
         class="titlebar-tool-icon shrink-0"
       />
       <div class="min-w-0 leading-tight">
@@ -91,7 +92,7 @@ function onCycleTheme() {
   border-bottom: 1px solid var(--ktool-border);
 }
 .titlebar-tool-icon {
-  color: var(--ktool-brand);
+  filter: saturate(1.08);
 }
 .titlebar-title {
   font-size: 14.5px;

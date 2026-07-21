@@ -1,12 +1,13 @@
 import type { ToolModule } from "../types";
 import CryptoTool from "./CryptoTool.vue";
-import { Shield } from "@vicons/ionicons5";
+import { LockClosedOutline } from "@vicons/ionicons5";
 
 export const cryptoTool: ToolModule = {
   id: "crypto",
   name: "加密工具",
   description: "MD5/SHA/UUID 生成等加密相关工具",
-  icon: Shield,
+  icon: LockClosedOutline,
+  accent: "#f59e0b",
   category: "加密",
   keywords: ["md5", "sha", "uuid", "hash", "加密", "解密"],
   component: CryptoTool,

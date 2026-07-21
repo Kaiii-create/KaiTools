@@ -1,7 +1,7 @@
 import type { Component } from "vue";
 
 /** 工具分类 */
-export type ToolCategory = "编码" | "时间" | "加密" | "转换" | "其他";
+export type ToolCategory = "编码" | "时间" | "加密" | "转换" | "二维码" | "其他";
 
 /** 历史记录条目 */
 export interface HistoryEntry {
@@ -25,6 +25,8 @@ export interface ToolModule {
   description?: string;
   /** 图标组件（vicons） */
   icon: Component;
+  /** 侧栏与标题栏中的工具强调色 */
+  accent?: string;
   /** 分类 */
   category: ToolCategory;
   /** 搜索关键词 */

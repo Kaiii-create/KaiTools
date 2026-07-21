@@ -17,7 +17,7 @@
       <n-button quaternary size="small" @click="hook.resetAll()">重置全部</n-button>
     </ToolToolbar>
 
-    <n-tabs v-model:value="tab" type="line" size="large" class="flex-1 kb-tabs" pane-class="kb-pane">
+    <n-tabs v-model:value="tab" type="line" size="large" class="flex-1 kb-tabs" pane-class="kb-pane" display-directive="show">
       <!-- Tab 1：键盘画面 -->
       <n-tab-pane name="keyboard" tab="键盘">
         <div class="kb-stage">
@@ -35,8 +35,14 @@
               <span class="kb-metric-label">历史总计</span>
             </div>
           </div>
+          <div class="kb-board-toolbar">
+            <div class="kb-layout-switch">
+              <button :class="{ on: layoutMode === 'compact' }" @click="layoutMode = 'compact'">无小键盘</button>
+              <button :class="{ on: layoutMode === 'full' }" @click="layoutMode = 'full'">带小键盘</button>
+            </div>
+          </div>
           <div class="kb-board-wrap">
-            <KeyboardVisual ref="visualRef" :counts="hook.countsByCode.value" accent="#6366f1" />
+            <KeyboardVisual :blocks="blocks" :counts="hook.countsByCode.value" accent="#6366f1" :active-code="activeCode" :active-seq="activeSeq" />
           </div>
           <p class="kb-tip">敲击键盘任意键，键帽会实时亮起并显示累计次数。切到「统计」查看详细数据。</p>
         </div>
@@ -108,18 +114,38 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { NButton, NCard, NSpace, NTag, NTabs, NTabPane, useMessage } from "naive-ui";
 import ToolPage from "@/components/tool/ToolPage.vue";
 import ToolToolbar from "@/components/tool/ToolToolbar.vue";
 import KeyboardVisual from "./KeyboardVisual.vue";
 import { useKeyboardHook } from "./useKeyboardHook";
+import { COMPACT_LAYOUT, FULL_LAYOUT_BLOCKS } from "./keyLayout";
 
 const message = useMessage();
 const hook = useKeyboardHook();
 
+// 键盘配列：紧凑（无小键盘）/ 带小键盘
+const LAYOUT_KEY = "ktool_kbd_layout";
+type LayoutMode = "compact" | "full";
+const layoutMode = ref<LayoutMode>(
+  (typeof localStorage !== "undefined" && (localStorage.getItem(LAYOUT_KEY) as LayoutMode)) ||
+    "compact"
+);
+watch(layoutMode, (v) => {
+  try {
+    localStorage.setItem(LAYOUT_KEY, v);
+  } catch {
+    /* ignore */
+  }
+});
+const blocks = computed(() =>
+  layoutMode.value === "full" ? FULL_LAYOUT_BLOCKS : [COMPACT_LAYOUT]
+);
+
 const tab = ref("keyboard");
-const visualRef = ref<InstanceType<typeof KeyboardVisual> | null>(null);
+const activeCode = ref<string | null>(null);
+const activeSeq = ref(0);
 const widgetOpen = ref(false);
 
 const topTodayKeys = computed(() =>
@@ -137,9 +163,23 @@ const topAllKeys = computed(() =>
 );
 
 function formatKey(key: string): string {
-  if (key === " ") return "Space";
+  if (key === "backspace") return "Backspace";
+  if (key === "space") return "Space";
+  if (key === "enter") return "Enter";
+  if (key === "tab") return "Tab";
+  if (key === "escape") return "Esc";
+  if (key.startsWith("arrow")) {
+    const arrows: Record<string, string> = {
+      arrowup: "↑",
+      arrowdown: "↓",
+      arrowleft: "←",
+      arrowright: "→",
+    };
+    return arrows[key] ?? key;
+  }
+  if (key.startsWith("numpad")) return "Num " + key.slice(6);
   if (key.length === 1) return key.toUpperCase();
-  return key;
+  return key.charAt(0).toUpperCase() + key.slice(1);
 }
 function getRankClass(index: number): string {
   switch (index) {
@@ -231,7 +271,8 @@ let offKey: (() => void) | null = null;
 onMounted(async () => {
   hook.loadFromStorage();
   offKey = hook.onKey((_combo, code) => {
-    visualRef.value?.trigger(code);
+    activeCode.value = code;
+    activeSeq.value++;
   });
   // 进入即自动开启监听
   try {
@@ -300,6 +341,40 @@ onUnmounted(async () => {
 .kb-board-wrap {
   width: 100%;
   max-width: 900px;
+}
+.kb-board-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+.kb-board-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.75);
+}
+.kb-layout-switch {
+  display: inline-flex;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 2px;
+}
+.kb-layout-switch button {
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.kb-layout-switch button.on {
+  background: #6366f1;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.45);
 }
 .kb-tip {
   font-size: 12px;

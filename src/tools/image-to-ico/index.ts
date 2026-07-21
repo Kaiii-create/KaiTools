@@ -1,12 +1,13 @@
 import type { ToolModule } from "../types";
 import ImageToIco from "./ImageToIco.vue";
-import { Image } from "@vicons/ionicons5";
+import { ImageOutline } from "@vicons/ionicons5";
 
 export const imageToIco: ToolModule = {
   id: "image-to-ico",
   name: "图片转 ICO",
   description: "将图片转换为 ICO 图标格式",
-  icon: Image,
+  icon: ImageOutline,
+  accent: "#3b82f6",
   category: "转换",
   keywords: ["image", "ico", "icon", "转换", "图标"],
   component: ImageToIco,

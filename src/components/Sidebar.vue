@@ -1,16 +1,7 @@
 <template>
   <aside class="sidebar flex flex-col h-full">
-    <!-- 品牌区域 -->
-    <div class="sidebar-brand flex items-center gap-2.5 px-4 h-14 shrink-0">
-      <div class="brand-mark">K</div>
-      <div class="min-w-0 leading-tight">
-        <div class="brand-name">KTool</div>
-        <div class="brand-sub">开发者工具箱</div>
-      </div>
-    </div>
-
     <!-- 搜索框 -->
-    <div class="px-3 pb-2 shrink-0">
+    <div class="px-3 pt-3 pb-2 shrink-0">
       <n-input
         v-model:value="search"
         placeholder="搜索工具"
@@ -40,7 +31,7 @@
           :class="{ 'nav-item--active': t.id === activeId }"
           @click="onSelect(t.id)"
         >
-          <span class="nav-item-icon"><n-icon :component="t.icon" :size="17" /></span>
+          <span class="nav-item-icon" :style="{ color: t.accent }"><n-icon :component="t.icon" :size="18" /></span>
           <span class="nav-item-name truncate">{{ t.name }}</span>
         </button>
         <div v-if="filtered.length === 0" class="nav-empty">
@@ -49,28 +40,8 @@
         </div>
       </template>
 
-      <!-- 常规态：收藏 + 分类 -->
+      <!-- 常规态：分类 -->
       <template v-else>
-        <!-- 收藏 -->
-        <div v-if="favItems.length" class="nav-group">
-          <div class="nav-group-label">
-            <n-icon :size="13"><Star /></n-icon> 收藏
-          </div>
-          <button
-            v-for="t in favItems"
-            :key="t.id"
-            class="nav-item"
-            :class="{ 'nav-item--active': t.id === activeId }"
-            @click="onSelect(t.id)"
-          >
-            <span class="nav-item-icon"><n-icon :component="t.icon" :size="17" /></span>
-            <span class="nav-item-name truncate">{{ t.name }}</span>
-            <span class="nav-item-star nav-item-star--on" @click.stop="onToggleFav(t.id)">
-              <n-icon :size="14"><Star /></n-icon>
-            </span>
-          </button>
-        </div>
-
         <!-- 分类列表 -->
         <div v-for="g in grouped" :key="g.category" class="nav-group">
           <div class="nav-group-label">{{ g.category }}</div>
@@ -81,15 +52,8 @@
             :class="{ 'nav-item--active': t.id === activeId }"
             @click="onSelect(t.id)"
           >
-            <span class="nav-item-icon"><n-icon :component="t.icon" :size="17" /></span>
+            <span class="nav-item-icon" :style="{ color: t.accent }"><n-icon :component="t.icon" :size="18" /></span>
             <span class="nav-item-name truncate">{{ t.name }}</span>
-            <span
-              class="nav-item-star"
-              :class="{ 'nav-item-star--on': isFav(t.id) }"
-              @click.stop="onToggleFav(t.id)"
-            >
-              <n-icon :size="14"><Star /></n-icon>
-            </span>
           </button>
         </div>
       </template>
@@ -111,11 +75,10 @@ import { NInput, NIcon } from "naive-ui";
 import {
   SearchOutline,
   SettingsOutline,
-  Star,
 } from "@vicons/ionicons5";
 import { tools, searchTools } from "@/tools/registry";
 import type { ToolCategory, ToolModule } from "@/tools/types";
-import { useNavStore } from "@/stores/nav";
+import { useSettingsStore } from "@/stores/settings";
 
 const props = defineProps<{ activeId: string }>();
 const emit = defineEmits<{
@@ -124,15 +87,20 @@ const emit = defineEmits<{
   (e: "open-command"): void;
 }>();
 
-const navStore = useNavStore();
+const settings = useSettingsStore();
 const search = ref("");
 
-const filtered = computed(() => searchTools(search.value));
+// 根据用户设置过滤掉被隐藏的工具
+const visibleTools = computed(() => tools.filter((t) => !settings.isToolHidden(t.id)));
 
-const categoryOrder: ToolCategory[] = ["编码", "时间", "加密", "转换", "其他"];
+const filtered = computed(() =>
+  searchTools(search.value).filter((t) => !settings.isToolHidden(t.id))
+);
+
+const categoryOrder: ToolCategory[] = ["编码", "时间", "加密", "转换", "二维码", "其他"];
 const grouped = computed(() => {
   const map = new Map<string, ToolModule[]>();
-  for (const t of tools) {
+  for (const t of visibleTools.value) {
     const c = t.category ?? "其他";
     if (!map.has(c)) map.set(c, []);
     map.get(c)!.push(t);
@@ -143,17 +111,7 @@ const grouped = computed(() => {
 });
 
 function byId(id: string): ToolModule | undefined {
-  return tools.find((t) => t.id === id);
-}
-
-const favItems = computed(() =>
-  navStore.favorites.map(byId).filter((t): t is ToolModule => !!t)
-);
-function isFav(id: string) {
-  return navStore.isFavorite(id);
-}
-function onToggleFav(id: string) {
-  navStore.toggleFavorite(id);
+  return visibleTools.value.find((t) => t.id === id);
 }
 
 function onSelect(id: string) {
@@ -177,32 +135,6 @@ void props;
   flex-shrink: 0;
   background: var(--ktool-surface);
   border-right: 1px solid var(--ktool-border);
-}
-
-/* —— 品牌 —— */
-.brand-mark {
-  width: 30px;
-  height: 30px;
-  border-radius: var(--ktool-radius);
-  background: var(--ktool-brand);
-  color: var(--ktool-brand-contrast);
-  font-weight: 700;
-  font-size: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  letter-spacing: -0.02em;
-}
-.brand-name {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--ktool-text);
-  line-height: 1.1;
-}
-.brand-sub {
-  font-size: 11px;
-  color: var(--ktool-text-mute);
-  line-height: 1.2;
 }
 
 .search-kbd {
@@ -256,37 +188,22 @@ void props;
   background: var(--ktool-brand-soft);
   color: var(--ktool-brand);
 }
-.nav-item--active .nav-item-icon {
-  color: var(--ktool-brand);
-}
 .nav-item-icon {
   display: flex;
-  color: var(--ktool-text-mute);
+  color: var(--tool-accent, var(--ktool-text-mute));
   flex-shrink: 0;
+  transition: transform var(--ktool-duration) var(--ktool-ease),
+    color var(--ktool-duration) var(--ktool-ease);
+}
+.nav-item:hover .nav-item-icon,
+.nav-item--active .nav-item-icon {
+  transform: scale(1.06);
 }
 .nav-item-name {
   font-size: 13px;
   font-weight: 500;
   flex: 1;
   min-width: 0;
-}
-.nav-item-star {
-  display: flex;
-  color: var(--ktool-text-mute);
-  opacity: 0;
-  flex-shrink: 0;
-  transition: opacity var(--ktool-duration) var(--ktool-ease),
-    color var(--ktool-duration) var(--ktool-ease);
-}
-.nav-item:hover .nav-item-star {
-  opacity: 0.7;
-}
-.nav-item-star:hover {
-  color: var(--ktool-brand);
-}
-.nav-item-star--on {
-  opacity: 1;
-  color: var(--ktool-brand);
 }
 
 .nav-empty {

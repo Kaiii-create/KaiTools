@@ -7,6 +7,7 @@ export const colorTool: ToolModule = {
   name: "颜色工具",
   description: "颜色拾取、调色、格式转换",
   icon: ColorPaletteOutline,
+  accent: "#ec4899",
   category: "转换",
   keywords: ["color", "rgb", "hex", "rgba", "hsl", "拾色器", "调色"],
   component: ColorTool,

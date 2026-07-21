@@ -22,6 +22,22 @@ pub struct HttpResponse {
     pub error: Option<String>,
 }
 
+/// 按 URL 抓取图片原始字节，供前端解码二维码（绕过 WebView CSP 限制）
+#[tauri::command]
+pub async fn fetch_image_bytes(url: String) -> Result<Vec<u8>, String> {
+    let client = Client::new();
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| format!("请求失败：{e}"))?;
+    if !resp.status().is_success() {
+        return Err(format!("HTTP {}", resp.status()));
+    }
+    let bytes = resp.bytes().await.map_err(|e| format!("读取失败：{e}"))?;
+    Ok(bytes.to_vec())
+}
+
 #[tauri::command]
 pub async fn http_request(args: HttpRequestArgs) -> HttpResponse {
     let start = Instant::now();

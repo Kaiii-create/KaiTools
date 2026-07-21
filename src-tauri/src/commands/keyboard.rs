@@ -6,10 +6,14 @@ use windows::Win32::Foundation::{HINSTANCE, LRESULT, LPARAM, WPARAM};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::System::Threading::GetCurrentThreadId;
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    GetAsyncKeyState, VK_0, VK_9, VK_A, VK_B, VK_C,
-    VK_D, VK_E, VK_F, VK_G, VK_H, VK_I, VK_J, VK_K, VK_L, VK_M, VK_N, VK_O, VK_P, VK_Q, VK_R, VK_S,
-    VK_T, VK_U, VK_V, VK_W, VK_X, VK_Y, VK_Z,     VK_SPACE, VK_RETURN, VK_BACK, VK_TAB, VK_SHIFT,
-    VK_CONTROL, VK_MENU, VK_LWIN, VK_RWIN,
+    GetAsyncKeyState, VK_0, VK_9, VK_A, VK_Z, VK_SPACE, VK_RETURN, VK_TAB, VK_BACK, VK_SHIFT,
+    VK_CONTROL, VK_MENU, VK_LWIN, VK_RWIN, VK_CAPITAL, VK_ESCAPE, VK_PRIOR, VK_NEXT, VK_END,
+    VK_HOME, VK_LEFT, VK_UP, VK_RIGHT, VK_DOWN, VK_INSERT, VK_DELETE, VK_MULTIPLY, VK_ADD,
+    VK_SUBTRACT, VK_DECIMAL, VK_DIVIDE, VK_SEPARATOR, VK_NUMPAD0, VK_NUMPAD1, VK_NUMPAD2,
+    VK_NUMPAD3, VK_NUMPAD4, VK_NUMPAD5, VK_NUMPAD6, VK_NUMPAD7, VK_NUMPAD8, VK_NUMPAD9, VK_F1,
+    VK_F2, VK_F3, VK_F4, VK_F5, VK_F6, VK_F7, VK_F8, VK_F9, VK_F10, VK_F11, VK_F12, VK_NUMLOCK,
+    VK_SCROLL, VK_SNAPSHOT, VK_PAUSE, VK_OEM_3, VK_OEM_MINUS, VK_OEM_PLUS, VK_OEM_4, VK_OEM_6,
+    VK_OEM_5, VK_OEM_1, VK_OEM_7, VK_OEM_COMMA, VK_OEM_PERIOD, VK_OEM_2,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, DispatchMessageW, GetMessageW, KBDLLHOOKSTRUCT, PostThreadMessageW,
@@ -22,47 +26,84 @@ static HOOK_THREAD_ID: AtomicU32 = AtomicU32::new(0);
 static HOOK_HANDLE: Mutex<Option<HHOOK>> = Mutex::new(None);
 static APP_HANDLE: Mutex<Option<AppHandle>> = Mutex::new(None);
 
-fn vk_to_string(vk_code: u32) -> String {
+/// 把虚拟键码映射为稳定的按键 token（需与前端布局 code 保持一致）。
+/// 未识别的键返回 vk{code}，保证任何按键都会被统计到。
+fn vk_to_token(vk_code: u32) -> String {
     let vk = vk_code as u16;
     if (VK_0.0..=VK_9.0).contains(&vk) {
-        return char::from_digit((vk - VK_0.0) as u32, 10)
-            .unwrap_or('?')
-            .to_string();
+        return (vk - VK_0.0).to_string();
     }
-    let ch = match vk {
-        v if v == VK_A.0 => 'a',
-        v if v == VK_B.0 => 'b',
-        v if v == VK_C.0 => 'c',
-        v if v == VK_D.0 => 'd',
-        v if v == VK_E.0 => 'e',
-        v if v == VK_F.0 => 'f',
-        v if v == VK_G.0 => 'g',
-        v if v == VK_H.0 => 'h',
-        v if v == VK_I.0 => 'i',
-        v if v == VK_J.0 => 'j',
-        v if v == VK_K.0 => 'k',
-        v if v == VK_L.0 => 'l',
-        v if v == VK_M.0 => 'm',
-        v if v == VK_N.0 => 'n',
-        v if v == VK_O.0 => 'o',
-        v if v == VK_P.0 => 'p',
-        v if v == VK_Q.0 => 'q',
-        v if v == VK_R.0 => 'r',
-        v if v == VK_S.0 => 's',
-        v if v == VK_T.0 => 't',
-        v if v == VK_U.0 => 'u',
-        v if v == VK_V.0 => 'v',
-        v if v == VK_W.0 => 'w',
-        v if v == VK_X.0 => 'x',
-        v if v == VK_Y.0 => 'y',
-        v if v == VK_Z.0 => 'z',
-        v if v == VK_SPACE.0 => ' ',
-        v if v == VK_RETURN.0 => '\n',
-        v if v == VK_TAB.0 => '\t',
-        v if v == VK_BACK.0 => '\u{8}',
-        _ => return String::new(),
+    if (VK_A.0..=VK_Z.0).contains(&vk) {
+        return char::from(b'a' + (vk - VK_A.0) as u8).to_string();
+    }
+    let token = match vk {
+        v if v == VK_SPACE.0 => "space",
+        v if v == VK_RETURN.0 => "enter",
+        v if v == VK_TAB.0 => "tab",
+        v if v == VK_BACK.0 => "backspace",
+        v if v == VK_CAPITAL.0 => "capslock",
+        v if v == VK_ESCAPE.0 => "escape",
+        v if v == VK_SHIFT.0 => "shift",
+        v if v == VK_CONTROL.0 => "ctrl",
+        v if v == VK_MENU.0 => "alt",
+        v if v == VK_LWIN.0 => "win",
+        v if v == VK_RWIN.0 => "win",
+        v if v == VK_PRIOR.0 => "pageup",
+        v if v == VK_NEXT.0 => "pagedown",
+        v if v == VK_END.0 => "end",
+        v if v == VK_HOME.0 => "home",
+        v if v == VK_LEFT.0 => "arrowleft",
+        v if v == VK_UP.0 => "arrowup",
+        v if v == VK_RIGHT.0 => "arrowright",
+        v if v == VK_DOWN.0 => "arrowdown",
+        v if v == VK_INSERT.0 => "insert",
+        v if v == VK_DELETE.0 => "delete",
+        v if v == VK_MULTIPLY.0 => "numpadmul",
+        v if v == VK_ADD.0 => "numpadadd",
+        v if v == VK_SUBTRACT.0 => "numpadsub",
+        v if v == VK_DECIMAL.0 => "numpaddot",
+        v if v == VK_DIVIDE.0 => "numpaddiv",
+        v if v == VK_SEPARATOR.0 => "numpadsep",
+        v if v == VK_NUMPAD0.0 => "numpad0",
+        v if v == VK_NUMPAD1.0 => "numpad1",
+        v if v == VK_NUMPAD2.0 => "numpad2",
+        v if v == VK_NUMPAD3.0 => "numpad3",
+        v if v == VK_NUMPAD4.0 => "numpad4",
+        v if v == VK_NUMPAD5.0 => "numpad5",
+        v if v == VK_NUMPAD6.0 => "numpad6",
+        v if v == VK_NUMPAD7.0 => "numpad7",
+        v if v == VK_NUMPAD8.0 => "numpad8",
+        v if v == VK_NUMPAD9.0 => "numpad9",
+        v if v == VK_F1.0 => "f1",
+        v if v == VK_F2.0 => "f2",
+        v if v == VK_F3.0 => "f3",
+        v if v == VK_F4.0 => "f4",
+        v if v == VK_F5.0 => "f5",
+        v if v == VK_F6.0 => "f6",
+        v if v == VK_F7.0 => "f7",
+        v if v == VK_F8.0 => "f8",
+        v if v == VK_F9.0 => "f9",
+        v if v == VK_F10.0 => "f10",
+        v if v == VK_F11.0 => "f11",
+        v if v == VK_F12.0 => "f12",
+        v if v == VK_NUMLOCK.0 => "numlock",
+        v if v == VK_SCROLL.0 => "scrolllock",
+        v if v == VK_SNAPSHOT.0 => "printscreen",
+        v if v == VK_PAUSE.0 => "pause",
+        v if v == VK_OEM_3.0 => "`",
+        v if v == VK_OEM_MINUS.0 => "-",
+        v if v == VK_OEM_PLUS.0 => "=",
+        v if v == VK_OEM_4.0 => "[",
+        v if v == VK_OEM_6.0 => "]",
+        v if v == VK_OEM_5.0 => "\\",
+        v if v == VK_OEM_1.0 => ";",
+        v if v == VK_OEM_7.0 => "'",
+        v if v == VK_OEM_COMMA.0 => ",",
+        v if v == VK_OEM_PERIOD.0 => ".",
+        v if v == VK_OEM_2.0 => "/",
+        _ => return format!("vk{vk_code}"),
     };
-    ch.to_string()
+    token.to_string()
 }
 
 unsafe extern "system" fn keyboard_proc(
@@ -76,25 +117,34 @@ unsafe extern "system" fn keyboard_proc(
     let msg = wparam.0 as u32;
     if msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN {
         let kb = *(lparam.0 as *const KBDLLHOOKSTRUCT);
-        let key = vk_to_string(kb.vkCode);
+        let key = vk_to_token(kb.vkCode);
+
+        let ctrl = GetAsyncKeyState(VK_CONTROL.0 as i32) < 0;
+        let alt = GetAsyncKeyState(VK_MENU.0 as i32) < 0;
+        let shift = GetAsyncKeyState(VK_SHIFT.0 as i32) < 0;
+        let win = GetAsyncKeyState(VK_LWIN.0 as i32) < 0
+            || GetAsyncKeyState(VK_RWIN.0 as i32) < 0;
+
+        // 组合键：修饰符作为前缀，但若当前按键本身就是该修饰符则不重复前缀
         let mut combo = String::new();
-        if GetAsyncKeyState(VK_CONTROL.0 as i32) < 0 {
+        if ctrl && key != "ctrl" {
             combo.push_str("Ctrl+");
         }
-        if GetAsyncKeyState(VK_MENU.0 as i32) < 0 {
+        if alt && key != "alt" {
             combo.push_str("Alt+");
         }
-        if GetAsyncKeyState(VK_SHIFT.0 as i32) < 0 {
+        if shift && key != "shift" {
             combo.push_str("Shift+");
         }
-        if GetAsyncKeyState(VK_LWIN.0 as i32) < 0 || GetAsyncKeyState(VK_RWIN.0 as i32) < 0 {
+        if win && key != "win" {
             combo.push_str("Win+");
         }
-        if !key.is_empty() {
-            combo.push_str(&key);
-        }
-        if let Some(app) = APP_HANDLE.lock().unwrap().as_ref() {
-            let _ = app.emit("keyboard-event", &combo);
+        combo.push_str(&key);
+
+        if !combo.is_empty() {
+            if let Some(app) = APP_HANDLE.lock().unwrap().as_ref() {
+                let _ = app.emit("keyboard-event", &combo);
+            }
         }
     }
     CallNextHookEx(None, code, wparam, lparam)

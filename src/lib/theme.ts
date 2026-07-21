@@ -112,6 +112,30 @@ export const darkThemeOverrides: GlobalThemeOverrides = {
   Drawer: { color: cssVar("--ktool-surface", "#16181d") },
   Modal: { color: cssVar("--ktool-surface", "#16181d") },
   Card: { color: cssVar("--ktool-surface", "#16181d") },
+  /* 深色下输入框：背景用深色 surface，聚焦时略提亮，避免聚焦变白 */
+  Input: {
+    color: cssVar("--ktool-surface", "#16181d"),
+    colorHover: cssVar("--ktool-surface-2", "#1b1e24"),
+    colorFocus: cssVar("--ktool-surface-2", "#1b1e24"),
+    colorDisabled: cssVar("--ktool-surface-inset", "#121419"),
+    border: cssVar("--ktool-border", "#262a32"),
+    borderHover: cssVar("--ktool-brand", "#6366f1"),
+    borderFocus: cssVar("--ktool-brand", "#6366f1"),
+    boxShadowFocus: "0 0 0 2px var(--ktool-brand-soft)",
+    textColor: cssVar("--ktool-text", "#e7e9ed"),
+    placeholderColor: cssVar("--ktool-text-mute", "#6b7280"),
+  },
+  /* 数字输入框同样处理 */
+  InputNumber: {
+    color: cssVar("--ktool-surface", "#16181d"),
+    colorHover: cssVar("--ktool-surface-2", "#1b1e24"),
+    colorFocus: cssVar("--ktool-surface-2", "#1b1e24"),
+    border: cssVar("--ktool-border", "#262a32"),
+    borderHover: cssVar("--ktool-brand", "#6366f1"),
+    borderFocus: cssVar("--ktool-brand", "#6366f1"),
+    boxShadowFocus: "0 0 0 2px var(--ktool-brand-soft)",
+    textColor: cssVar("--ktool-text", "#e7e9ed"),
+  },
 };
 
 /** 根据当前是否深色，返回对应的主题覆盖 */

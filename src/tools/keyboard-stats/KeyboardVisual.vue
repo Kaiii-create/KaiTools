@@ -1,64 +1,75 @@
 <template>
-  <div class="kbd-visual" :style="{ '--kbd-accent': accent }">
-    <div
-      v-for="(row, ri) in rows"
-      :key="ri"
-      class="kbd-row"
-    >
+  <div class="kbd-visual" :class="{ compact }" :style="{ '--kbd-accent': accent }">
+    <div class="kbd-blocks">
       <div
-        v-for="(k, ki) in row"
-        :key="ri + '-' + ki + '-' + k.code"
-        class="kbd-key"
-        :class="{ 'is-active': activeMap[keyId(k)] }"
-        :style="keyStyle(k)"
-        :data-code="k.code"
+        v-for="(block, bi) in blocks"
+        :key="bi"
+        class="kbd-block"
+        :class="{ 'kbd-block--numpad': blocks.length > 1 && bi === blocks.length - 1 }"
       >
-        <!-- 波纹 -->
-        <span
-          v-for="r in ripples[keyId(k)] || []"
-          :key="r.id"
-          class="kbd-ripple"
-        />
-        <!-- 键帽内容 -->
-        <span class="kbd-label">{{ k.label || (k.code === 'space' ? '' : k.label) }}</span>
-        <span v-if="showCount && counts[k.code]" class="kbd-count">{{ formatCount(counts[k.code]) }}</span>
-        <!-- 浮起气泡 -->
-        <transition-group name="kbd-pop" tag="span" class="kbd-pop-layer">
-          <span
-            v-for="p in pops[keyId(k)] || []"
-            :key="p.id"
-            class="kbd-pop-bubble"
-          >+1</span>
-        </transition-group>
-        <!-- 光晕 -->
-        <span class="kbd-glow" />
+        <div v-for="(row, ri) in block" :key="ri" class="kbd-row">
+          <div
+            v-for="(k, ki) in row"
+            :key="ri + '-' + ki + '-' + k.code"
+            class="kbd-key"
+            :class="{ 'is-active': activeMap[keyId(k)] }"
+            :style="keyStyle(k)"
+            :data-code="k.code"
+          >
+            <!-- 波纹 -->
+            <span
+              v-for="r in ripples[keyId(k)] || []"
+              :key="r.id"
+              class="kbd-ripple"
+            />
+            <!-- 键帽内容 -->
+            <span class="kbd-label">{{ k.label }}</span>
+            <span v-if="showCount && counts[k.code]" class="kbd-count">{{ formatCount(counts[k.code]) }}</span>
+            <!-- 浮起气泡 -->
+            <transition-group name="kbd-pop" tag="span" class="kbd-pop-layer">
+              <span
+                v-for="p in pops[keyId(k)] || []"
+                :key="p.id"
+                class="kbd-pop-bubble"
+              >+1</span>
+            </transition-group>
+            <!-- 光晕 -->
+            <span class="kbd-glow" />
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { reactive } from "vue";
+import { reactive, watch } from "vue";
 import { KEYBOARD_ROWS, type KeyDef } from "./keyLayout";
 
 const props = withDefaults(
   defineProps<{
+    /** 键盘区块：每个区块是一组行（主键盘 / 小键盘等） */
+    blocks?: KeyDef[][][];
     counts?: Record<string, number>;
     accent?: string;
     showCount?: boolean;
     compact?: boolean;
+    /** 当前按下的物理键 code（由全局键盘钩子驱动） */
+    activeCode?: string | null;
+    /** 每次按键自增，用于触发特效 */
+    activeSeq?: number;
   }>(),
   {
+    blocks: () => [KEYBOARD_ROWS],
     counts: () => ({}),
     accent: "#6366f1",
     showCount: true,
     compact: false,
+    activeCode: null,
+    activeSeq: 0,
   }
 );
 
-const rows = KEYBOARD_ROWS;
-
-// 同一物理 code 可能出现多次（左右 Shift/Ctrl），用行列生成唯一 id 做动画定位
 function keyId(k: KeyDef): string {
   return k.code;
 }
@@ -70,16 +81,11 @@ let seq = 0;
 
 function keyStyle(k: KeyDef): Record<string, string> {
   const style: Record<string, string> = {};
-  if (k.flex) {
-    style.flex = "1";
-  } else {
-    style.flexGrow = String(k.w ?? 1);
-  }
+  style.flexGrow = String(k.w ?? 1);
   return style;
 }
 
 function formatCount(n: number): string {
-  if (n >= 10000) return (n / 1000).toFixed(1) + "k";
   if (n >= 1000) return (n / 1000).toFixed(1) + "k";
   return String(n);
 }
@@ -109,6 +115,14 @@ function trigger(code: string) {
   }, 700);
 }
 
+// 由外部（全局键盘钩子）驱动：监听按下序号变化触发特效，避免依赖 ref 时序
+watch(
+  () => props.activeSeq,
+  () => {
+    if (props.activeCode) trigger(props.activeCode);
+  }
+);
+
 defineExpose({ trigger });
 </script>
 
@@ -119,6 +133,23 @@ defineExpose({ trigger });
   gap: 6px;
   width: 100%;
   user-select: none;
+}
+.kbd-blocks {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+  width: 100%;
+}
+.kbd-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.kbd-block--numpad {
+  flex: 0 0 auto;
+  width: 230px;
 }
 .kbd-row {
   display: flex;
@@ -249,8 +280,7 @@ defineExpose({ trigger });
 }
 
 /* 紧凑模式（桌面小插件用） */
-.kbd-visual.compact .kbd-key,
-.compact .kbd-key {
+.kbd-visual.compact .kbd-key {
   height: 34px;
   border-radius: 7px;
   font-size: 10px;

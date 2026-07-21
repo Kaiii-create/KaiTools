@@ -17,25 +17,10 @@
 
     <div class="flex-1 grid grid-cols-2 gap-2 p-2 min-h-0">
       <div class="flex flex-col min-h-0">
-        <div class="text-xs text-[var(--ktool-text-mute)] mb-1 px-1">输入</div>
-        <n-input
-          v-model:value="input"
-          type="textarea"
-          placeholder="输入要编码/解码的内容（自动转换）"
-          class="flex-1"
-          style="height: 100%"
-        />
+        <EditorPane v-model="input" mono label="输入" placeholder="输入要编码/解码的内容（自动转换）" class="flex-1" />
       </div>
       <div class="flex flex-col min-h-0">
-        <div class="text-xs text-[var(--ktool-text-mute)] mb-1 px-1">输出</div>
-        <n-input
-          v-model:value="output"
-          type="textarea"
-          placeholder="结果"
-          readonly
-          class="flex-1"
-          style="height: 100%"
-        />
+        <EditorPane v-model="output" readonly mono label="输出" placeholder="结果" class="flex-1" />
       </div>
     </div>
 
@@ -54,9 +39,10 @@
 
 <script setup lang="ts">
 import { ref, watch } from "vue";
-import { NButton, NInput, NTabs, NTab, NDivider, NAlert, useMessage } from "naive-ui";
+import { NButton, NTabs, NTab, NDivider, NAlert, useMessage } from "naive-ui";
 import ToolPage from "@/components/tool/ToolPage.vue";
 import ToolToolbar from "@/components/tool/ToolToolbar.vue";
+import EditorPane from "@/components/tool/EditorPane.vue";
 
 const message = useMessage();
 

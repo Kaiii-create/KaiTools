@@ -1,12 +1,13 @@
 import type { ToolModule } from "../types";
 import Base64Url from "./Base64Url.vue";
-import { CodeSlash } from "@vicons/ionicons5";
+import { TextOutline } from "@vicons/ionicons5";
 
 export const base64Url: ToolModule = {
   id: "base64-url",
   name: "Base64 / URL 编解码",
   description: "Base64 与 URL 编解码",
-  icon: CodeSlash,
+  icon: TextOutline,
+  accent: "#8b5cf6",
   category: "编码",
   keywords: ["base64", "url", "encode", "decode", "编码", "解码"],
   component: Base64Url,

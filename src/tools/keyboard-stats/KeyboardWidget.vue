@@ -17,7 +17,7 @@
     <!-- 键盘可视化（缩放以适配尺寸） -->
     <div class="kw-board" :style="boardStyle">
       <div class="kw-scale" :style="{ transform: `scale(${scale})` }">
-        <KeyboardVisual ref="visualRef" :counts="hook.countsByCode.value" :accent="accent" :show-count="showCount" compact />
+        <KeyboardVisual :counts="hook.countsByCode.value" :accent="accent" :show-count="showCount" compact :active-code="activeCode" :active-seq="activeSeq" />
       </div>
     </div>
 
@@ -60,7 +60,8 @@ import KeyboardVisual from "./KeyboardVisual.vue";
 import { useKeyboardHook } from "./useKeyboardHook";
 
 const hook = useKeyboardHook();
-const visualRef = ref<InstanceType<typeof KeyboardVisual> | null>(null);
+const activeCode = ref<string | null>(null);
+const activeSeq = ref(0);
 
 const SETTINGS_KEY = "ktool_kbd_widget_settings";
 const showSettings = ref(false);
@@ -170,7 +171,8 @@ onMounted(async () => {
   hook.loadFromStorage();
   // 小插件只订阅事件（钩子由主窗口启动），触发特效
   hook.onKey((_combo, code) => {
-    visualRef.value?.trigger(code);
+    activeCode.value = code;
+    activeSeq.value++;
   });
   await hook.subscribeOnly();
   await applyWindowSize();

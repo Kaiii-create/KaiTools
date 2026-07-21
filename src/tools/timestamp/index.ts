@@ -7,6 +7,7 @@ export const timestamp: ToolModule = {
   name: "时间戳转换",
   description: "时间戳 ↔ 日期 双向转换",
   icon: TimeOutline,
+  accent: "#10b981",
   category: "时间",
   keywords: ["timestamp", "time", "date", "unix", "时间戳", "时间", "日期"],
   component: Timestamp,

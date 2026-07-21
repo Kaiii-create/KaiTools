@@ -34,6 +34,8 @@ function saveToStorage(items: HistoryItem[]) {
 
 export const useHistoryStore = defineStore("history", () => {
   const items = ref<HistoryItem[]>(loadFromStorage());
+  // 点击历史记录后要恢复到目标工具的待处理项
+  const pendingRestore = ref<HistoryItem | null>(null);
 
   const total = computed(() => items.value.length);
 
@@ -69,5 +71,24 @@ export const useHistoryStore = defineStore("history", () => {
     return items.value.filter((i) => i.toolId === toolId);
   }
 
-  return { items, total, add, remove, clear, clearByTool, getByTool };
+  function requestRestore(item: HistoryItem) {
+    pendingRestore.value = item;
+  }
+
+  function clearRestore() {
+    pendingRestore.value = null;
+  }
+
+  return {
+    items,
+    total,
+    add,
+    remove,
+    clear,
+    clearByTool,
+    getByTool,
+    pendingRestore,
+    requestRestore,
+    clearRestore,
+  };
 });

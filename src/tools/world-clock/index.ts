@@ -1,12 +1,13 @@
 import type { ToolModule } from "../types";
 import WorldClock from "./WorldClock.vue";
-import { Globe } from "@vicons/ionicons5";
+import { GlobeOutline } from "@vicons/ionicons5";
 
 export const worldClock: ToolModule = {
   id: "world-clock",
   name: "世界时钟",
   description: "查看全球各地时间",
-  icon: Globe,
+  icon: GlobeOutline,
+  accent: "#3b82f6",
   category: "时间",
   keywords: ["world", "clock", "time", "时区", "全球", "各地时间"],
   component: WorldClock,

@@ -1,12 +1,13 @@
 import type { ToolModule } from "../types";
 import MarkdownEditor from "./MarkdownEditor.vue";
-import { DocumentTextOutline } from "@vicons/ionicons5";
+import { LogoMarkdown } from "@vicons/ionicons5";
 
 export const markdownEditor: ToolModule = {
   id: "markdown-editor",
   name: "Markdown 编辑器",
   description: "Markdown 实时编辑预览",
-  icon: DocumentTextOutline,
+  icon: LogoMarkdown,
+  accent: "#8b5cf6",
   category: "编码",
   keywords: ["markdown", "md", "编辑器", "markdown editor"],
   component: MarkdownEditor,

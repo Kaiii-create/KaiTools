@@ -16,27 +16,10 @@
     <!-- 输入/输出区 -->
     <div class="flex-1 grid grid-cols-2 gap-2 p-2 min-h-0">
       <div class="flex flex-col min-h-0">
-        <div class="text-xs text-gray-500 mb-1 px-1">输入</div>
-        <n-input
-          v-model:value="input"
-          type="textarea"
-          placeholder="输入代码"
-          class="flex-1"
-          style="height: 100%"
-          round
-        />
+        <EditorPane v-model="input" mono label="输入" placeholder="输入代码" class="flex-1" />
       </div>
       <div class="flex flex-col min-h-0">
-        <div class="text-xs text-gray-500 mb-1 px-1">输出</div>
-        <n-input
-          v-model:value="output"
-          type="textarea"
-          placeholder="格式化结果"
-          readonly
-          class="flex-1"
-          style="height: 100%"
-          round
-        />
+        <EditorPane v-model="output" readonly mono label="输出" placeholder="格式化结果" class="flex-1" />
       </div>
     </div>
   </div>
@@ -44,7 +27,8 @@
 
 <script setup lang="ts">
 import { ref } from "vue";
-import { NButton, NInput, NSelect, NTag, useMessage } from "naive-ui";
+import { NButton, NSelect, NTag, useMessage } from "naive-ui";
+import EditorPane from "@/components/tool/EditorPane.vue";
 import prettier from "prettier/standalone";
 import parserHtml from "prettier/plugins/html";
 import parserCss from "prettier/plugins/postcss";

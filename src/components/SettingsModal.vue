@@ -12,7 +12,7 @@
       <section class="settings-section">
         <h3 class="settings-h">关于</h3>
         <div class="settings-about">
-          <div class="about-mark">K</div>
+          <img class="about-mark" :src="appIcon" alt="KTool" />
           <div>
             <div class="about-name">{{ about.appName || "KTool" }}</div>
             <div class="about-meta">
@@ -42,7 +42,34 @@
             </n-space>
           </n-radio-group>
         </div>
-        <p class="settings-hint">深色主题自动跟随 Windows 系统设置（当选择“跟随系统”时）。</p>
+        <p class="settings-hint">深色主题自动跟随 Windows 系统设置（当选择"跟随系统"时）。</p>
+      </section>
+
+      <!-- 窗口与启动 -->
+      <section class="settings-section">
+        <h3 class="settings-h">窗口与启动</h3>
+        <div class="settings-row">
+          <span class="settings-label">关闭时</span>
+          <n-radio-group
+            :value="settings.data.closeBehavior"
+            @update:value="(v: CloseBehavior) => settings.setCloseBehavior(v)"
+          >
+            <n-space>
+              <n-radio value="ask" label="询问我" />
+              <n-radio value="minimize" label="最小化到托盘" />
+              <n-radio value="quit" label="直接退出" />
+            </n-space>
+          </n-radio-group>
+        </div>
+        <p class="settings-hint">
+          选择"询问我"时，点击关闭会弹出选择框（可勾选"不再提示"记住选择）。
+        </p>
+        <div class="settings-row mt-3">
+          <span class="settings-label">开机自启</span>
+          <n-switch :value="autoStartOn" @update:value="onAutoStartChange" />
+          <span class="settings-hint-inline">{{ autoStartOn ? "已开启" : "已关闭" }}</span>
+        </div>
+        <p class="settings-hint">登录系统后自动在后台启动 KTool。</p>
       </section>
 
       <!-- 快捷键 -->
@@ -53,6 +80,47 @@
           <kbd class="settings-kbd">Ctrl</kbd> + <kbd class="settings-kbd">K</kbd>
           <span class="settings-hint-inline">打开命令面板，搜索并切换工具</span>
         </div>
+      </section>
+
+      <!-- 屏幕取色 -->
+      <section class="settings-section">
+        <h3 class="settings-h">屏幕取色</h3>
+        <div class="settings-row">
+          <span class="settings-label">快捷键</span>
+          <n-input
+            :value="recording ? '请按下组合键…' : settings.data.pickerShortcut"
+            readonly
+            size="small"
+            class="shortcut-input"
+          />
+          <n-button size="small" :type="recording ? 'error' : 'default'" @click="toggleRecord">
+            {{ recording ? "停止录制" : "录制" }}
+          </n-button>
+        </div>
+        <p class="settings-hint">
+          全局快捷键，唤起屏幕取色（放大镜跟随光标，单击取色、Esc 取消）。置空则不启用。
+        </p>
+        <p v-if="shortcutError" class="shortcut-error">{{ shortcutError }}</p>
+      </section>
+
+      <!-- 工具显示 -->
+      <section class="settings-section">
+        <h3 class="settings-h">工具显示</h3>
+        <p class="settings-hint">
+          关闭后该工具将从左侧导航隐藏，仍可在命令面板（Ctrl K）中搜索打开。
+        </p>
+        <div class="tool-toggle-grid">
+          <div v-for="t in allTools" :key="t.id" class="tool-toggle-item">
+            <span class="tool-name">{{ t.name }}</span>
+            <n-switch
+              :value="!settings.isToolHidden(t.id)"
+              @update:value="(v: boolean) => settings.setToolHidden(t.id, !v)"
+            />
+          </div>
+        </div>
+        <n-button size="small" tertiary class="mt-3" @click="settings.showAllTools()">
+          全部显示
+        </n-button>
       </section>
 
       <!-- 数据 -->
@@ -71,21 +139,103 @@
 </template>
 
 <script setup lang="ts">
+import { ref, onMounted, onUnmounted } from "vue";
 import {
   NModal,
   NRadioGroup,
   NRadio,
   NSpace,
   NButton,
+  NInput,
+  NSwitch,
 } from "naive-ui";
+import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { useThemeStore, type ThemeMode } from "@/stores/theme";
 import { useHistoryStore } from "@/stores/history";
+import { useSettingsStore, type CloseBehavior } from "@/stores/settings";
+import { tools } from "@/tools/registry";
+import appIcon from "@/assets/brand/ktool-app-icon-ui.png";
 
 defineProps<{ show: boolean }>();
 const emit = defineEmits<{ (e: "update:show", v: boolean): void }>();
 
 const themeStore = useThemeStore();
 const historyStore = useHistoryStore();
+const settings = useSettingsStore();
+const allTools = tools;
+
+// 开机自启：以系统实际状态为准
+const autoStartOn = ref(settings.data.autoStart);
+async function syncAutoStart() {
+  try {
+    autoStartOn.value = await isEnabled();
+    settings.setAutoStart(autoStartOn.value);
+  } catch {
+    // 浏览器预览环境忽略
+  }
+}
+async function onAutoStartChange(v: boolean) {
+  try {
+    if (v) await enable();
+    else await disable();
+    autoStartOn.value = v;
+    settings.setAutoStart(v);
+  } catch {
+    // 忽略失败
+  }
+}
+
+const recording = ref(false);
+const shortcutError = ref("");
+
+function toggleRecord() {
+  // 再次点击则停止录制
+  if (recording.value) {
+    recording.value = false;
+    return;
+  }
+  recording.value = true;
+  shortcutError.value = "";
+}
+
+function onRecordKey(e: KeyboardEvent) {
+  if (!recording.value) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const key = e.key;
+  // 仅修饰键时继续等待真正的按键
+  if (["Control", "Alt", "Shift", "Meta"].includes(key)) return;
+  const parts: string[] = [];
+  if (e.ctrlKey) parts.push("Ctrl");
+  if (e.altKey) parts.push("Alt");
+  if (e.shiftKey) parts.push("Shift");
+  if (e.metaKey) parts.push("Meta");
+  let k = key;
+  if (key === " ") k = "Space";
+  else if (key.length === 1) k = key.toUpperCase();
+  parts.push(k);
+  const combo = parts.join("+");
+  // 必须有非修饰键；纯修饰键组合无效，提示后放弃本次录入
+  if (parts.length === 0) {
+    recording.value = false;
+    return;
+  }
+  const hasNonModifier = !["Ctrl", "Alt", "Shift", "Meta"].includes(k);
+  if (!hasNonModifier) {
+    shortcutError.value = "快捷键必须包含至少一个普通按键（不能只有修饰键）";
+    recording.value = false;
+    return;
+  }
+  shortcutError.value = "";
+  recording.value = false;
+  settings.setPickerShortcut(combo);
+}
+
+onMounted(() => {
+  window.addEventListener("keydown", onRecordKey, true);
+  syncAutoStart();
+});
+onUnmounted(() => window.removeEventListener("keydown", onRecordKey, true));
 
 const about = {
   appName: (window as any).__KTOOL_APP_INFO__?.appName ?? "KTool",
@@ -150,14 +300,8 @@ const about = {
 .about-mark {
   width: 40px;
   height: 40px;
-  border-radius: var(--ktool-radius);
-  background: var(--ktool-brand);
-  color: var(--ktool-brand-contrast);
-  font-weight: 700;
-  font-size: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  object-fit: contain;
+  flex-shrink: 0;
 }
 .about-name {
   font-size: 16px;
@@ -177,5 +321,34 @@ const about = {
   height: 3px;
   border-radius: 50%;
   background: var(--ktool-text-mute);
+}
+.shortcut-input {
+  flex: 1;
+  max-width: 240px;
+}
+.shortcut-error {
+  font-size: 12px;
+  color: var(--ktool-danger);
+  margin: 8px 0 0;
+}
+.tool-toggle-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 16px;
+  margin-top: 12px;
+}
+.tool-toggle-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--ktool-border);
+  border-radius: var(--ktool-radius);
+  background: var(--ktool-surface-2);
+}
+.tool-name {
+  font-size: 13px;
+  color: var(--ktool-text);
 }
 </style>

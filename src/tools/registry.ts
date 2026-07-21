@@ -12,6 +12,11 @@ import { imageToIco } from "./image-to-ico";
 import { keyboardStats } from "./keyboard-stats";
 import { codeDiff } from "./code-diff";
 import { markdownEditor } from "./markdown-editor";
+import { qrDecode } from "./qr-decode";
+import { textBatch } from "./text-batch";
+import { regexTester } from "./regex-tester";
+import { generator } from "./generator";
+import { baseConvert } from "./base-convert";
 
 /** 工具注册表（中央目录）
  *
@@ -43,6 +48,11 @@ register(imageToIco);
 register(keyboardStats);
 register(codeDiff);
 register(markdownEditor);
+register(qrDecode);
+register(textBatch);
+register(regexTester);
+register(generator);
+register(baseConvert);
 
 export const tools = Array.from(registry.values());
 

@@ -7,7 +7,8 @@ export const qrcode: ToolModule = {
   name: "二维码生成",
   description: "输入文本生成二维码，可下载",
   icon: QrCodeOutline,
-  category: "其他",
+  accent: "#10b981",
+  category: "二维码",
   keywords: ["qrcode", "qr", "二维码", "条码"],
   component: Qrcode,
   toHistory(input, output) {

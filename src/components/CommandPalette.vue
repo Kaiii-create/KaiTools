@@ -33,7 +33,7 @@
               @mouseenter="activeIndex = i"
               @click="select(t.id)"
             >
-              <span class="kp-item-icon">
+              <span class="kp-item-icon" :style="{ color: t.accent }">
                 <n-icon :component="t.icon" :size="17" />
               </span>
               <span class="kp-item-name truncate">{{ t.name }}</span>

@@ -34,9 +34,9 @@
 
       <ul v-else class="history-list">
         <li v-for="(item, idx) in grouped" :key="idx" class="history-item">
-          <button class="history-card" @click="onSelect(item.toolId)">
+          <button class="history-card" @click="onSelect(item)">
             <div class="flex items-center gap-2.5">
-              <span class="history-icon">
+              <span class="history-icon" :style="{ color: toolAccent(item.toolId) }">
                 <n-icon :component="toolIcon(item.toolId)" :size="16" />
               </span>
               <div class="min-w-0 flex-1">
@@ -70,7 +70,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{
   (e: "update:show", v: boolean): void;
-  (e: "select", toolId: string): void;
+  (e: "select", item: HistoryItem): void;
   (e: "clear"): void;
 }>();
 
@@ -85,11 +85,14 @@ function toolName(id: string) {
 function toolIcon(id: string) {
   return toolById(id)?.icon;
 }
+function toolAccent(id: string) {
+  return toolById(id)?.accent ?? "var(--ktool-brand)";
+}
 function preview(item: HistoryItem): string {
   return item.title || item.input.slice(0, 48) || "(空)";
 }
-function onSelect(id: string) {
-  emit("select", id);
+function onSelect(item: HistoryItem) {
+  emit("select", item);
   emit("update:show", false);
 }
 
@@ -136,6 +139,7 @@ function formatTime(ts: number): string {
 }
 .history-card {
   width: 100%;
+  box-sizing: border-box;
   text-align: left;
   display: flex;
   align-items: center;
@@ -146,6 +150,7 @@ function formatTime(ts: number): string {
   background: var(--ktool-surface-2);
   border: 1px solid var(--ktool-border);
   cursor: pointer;
+  overflow: hidden;
   transition: background var(--ktool-duration) var(--ktool-ease),
     border-color var(--ktool-duration) var(--ktool-ease);
 }
@@ -172,7 +177,10 @@ function formatTime(ts: number): string {
 .history-preview {
   font-size: 12px;
   color: var(--ktool-text-mute);
-  max-width: 230px;
+  max-width: 196px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .history-time {
   font-size: 11px;
@@ -180,5 +188,10 @@ function formatTime(ts: number): string {
   flex-shrink: 0;
   align-self: flex-start;
   padding-top: 2px;
+  max-width: 88px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
 }
 </style>

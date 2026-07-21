@@ -2,7 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "KTool 主窗口与桌面小插件默认权限",
-  "windows": ["main", "kbd-widget"],
+  "windows": ["main", "kbd-widget", "color-picker"],
   "permissions": [
     "core:default",
     "core:window:allow-show",
@@ -17,6 +17,11 @@
     "core:window:allow-set-position",
     "core:window:allow-set-always-on-top",
     "core:window:allow-start-dragging",
+    "core:window:allow-create",
+    "core:window:allow-set-fullscreen",
+    "core:event:allow-listen",
+    "core:event:allow-emit",
+    "core:event:allow-emit-to",
     "core:webview:allow-create-webview-window",
     "core:webview:allow-webview-close",
     "shell:allow-open",
@@ -34,7 +39,8 @@
       "identifier": "fs:scope",
       "allow": [{ "path": "**" }]
     },
-    "global-shortcut:allow-register",
-    "global-shortcut:allow-unregister"
+    "autostart:allow-enable",
+    "autostart:allow-disable",
+    "autostart:allow-is-enabled"
   ]
 }
