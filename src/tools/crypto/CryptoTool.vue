@@ -71,6 +71,7 @@ import { NButton, NInput, NSelect, NCard, NSpace, NInputNumber, NSwitch, useMess
 import ToolPage from "@/components/tool/ToolPage.vue";
 import ToolToolbar from "@/components/tool/ToolToolbar.vue";
 import CryptoJS from "crypto-js";
+import { parseHistoryInput, useToolHistory } from "@/composables/useToolHistory";
 
 const message = useMessage();
 
@@ -79,6 +80,20 @@ const input = ref("");
 const output = ref("");
 const uuidCount = ref(5);
 const uuidNoHyphen = ref(false);
+const history = useToolHistory("crypto", "加密工具", (item) => {
+  const saved = parseHistoryInput<{
+    mode: string;
+    text: string;
+    uuidCount?: number;
+    uuidNoHyphen?: boolean;
+  }>(item.input);
+  if (!saved) return;
+  mode.value = saved.mode;
+  input.value = saved.text;
+  uuidCount.value = saved.uuidCount ?? uuidCount.value;
+  uuidNoHyphen.value = saved.uuidNoHyphen ?? uuidNoHyphen.value;
+  output.value = item.output;
+});
 
 const modes = [
   { label: "MD5", value: "md5" },
@@ -111,11 +126,17 @@ const md5Results = computed(() => {
 });
 
 function generateUUID(): string {
-  let uuid = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === "x" ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
+  let uuid: string;
+  if (typeof crypto.randomUUID === "function") {
+    uuid = crypto.randomUUID();
+  } else {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0"));
+    uuid = `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex.slice(6, 8).join("")}-${hex.slice(8, 10).join("")}-${hex.slice(10).join("")}`;
+  }
   if (uuidNoHyphen.value) uuid = uuid.replace(/-/g, "");
   return uuid;
 }
@@ -149,6 +170,16 @@ function onExecute() {
         break;
       }
     }
+    history.record({
+      title: modes.find((item) => item.value === mode.value)?.label ?? mode.value,
+      input: JSON.stringify({
+        mode: mode.value,
+        text: input.value,
+        uuidCount: uuidCount.value,
+        uuidNoHyphen: uuidNoHyphen.value,
+      }),
+      output: output.value,
+    });
     message.success("执行成功");
   } catch (e) {
     output.value = "";

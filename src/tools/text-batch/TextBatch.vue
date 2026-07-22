@@ -44,64 +44,76 @@ import { NButton, NInput, NDivider } from "naive-ui";
 import ToolPage from "@/components/tool/ToolPage.vue";
 import ToolToolbar from "@/components/tool/ToolToolbar.vue";
 import EditorPane from "@/components/tool/EditorPane.vue";
+import { useToolHistory } from "@/composables/useToolHistory";
 
 const input = ref("");
 const output = ref("");
+const hasOutput = ref(false);
 const findText = ref("");
 const replaceText = ref("");
 const prefix = ref("");
 const suffix = ref("");
+const history = useToolHistory("text-batch", "文本批量处理", (item) => {
+  input.value = item.input;
+  output.value = item.output;
+  hasOutput.value = !!item.output;
+});
 
 const outputLineCount = computed(() => (output.value ? output.value.split("\n").length : 0));
 
 // 链式处理：若输出非空则以输出为源，否则以输入为源
 function getSource(): string {
-  return output.value.trim() ? output.value : input.value;
+  return hasOutput.value ? output.value : input.value;
 }
-function setResult(text: string) {
+function setResult(text: string, action: string) {
+  const source = getSource();
   output.value = text;
+  hasOutput.value = true;
+  history.record({ title: action, input: source, output: text });
 }
 function lines(): string[] {
   return getSource().split(/\r?\n/);
 }
 
 function removeEmpty() {
-  setResult(lines().filter((l) => l.trim() !== "").join("\n"));
+  setResult(lines().filter((l) => l.trim() !== "").join("\n"), "移除空行");
 }
 function dedupe() {
-  setResult([...new Set(lines())].join("\n"));
+  setResult([...new Set(lines())].join("\n"), "文本去重");
 }
 function sortAsc() {
-  setResult([...lines()].sort((a, b) => a.localeCompare(b, "zh-CN")).join("\n"));
+  setResult([...lines()].sort((a, b) => a.localeCompare(b, "zh-CN")).join("\n"), "升序排列");
 }
 function sortDesc() {
-  setResult([...lines()].sort((a, b) => b.localeCompare(a, "zh-CN")).join("\n"));
+  setResult([...lines()].sort((a, b) => b.localeCompare(a, "zh-CN")).join("\n"), "降序排列");
 }
 function toUpper() {
-  setResult(lines().map((l) => l.toUpperCase()).join("\n"));
+  setResult(lines().map((l) => l.toUpperCase()).join("\n"), "转为大写");
 }
 function toLower() {
-  setResult(lines().map((l) => l.toLowerCase()).join("\n"));
+  setResult(lines().map((l) => l.toLowerCase()).join("\n"), "转为小写");
 }
 function reverseLines() {
-  setResult([...lines()].reverse().join("\n"));
+  setResult([...lines()].reverse().join("\n"), "行序反转");
 }
 function mergeOne() {
-  setResult(lines().join(""));
+  setResult(lines().join(""), "合并为一行");
 }
 function doReplace() {
   if (!findText.value) return;
-  setResult(getSource().split(findText.value).join(replaceText.value));
+  setResult(getSource().split(findText.value).join(replaceText.value), "查找替换");
 }
 function applyAffix() {
-  setResult(lines().map((l) => prefix.value + l + suffix.value).join("\n"));
+  setResult(lines().map((l) => prefix.value + l + suffix.value).join("\n"), "添加前后缀");
 }
 function resetSource() {
   output.value = "";
+  hasOutput.value = false;
 }
 function clearAll() {
   input.value = "";
   output.value = "";
+  hasOutput.value = false;
 }
 </script>
 

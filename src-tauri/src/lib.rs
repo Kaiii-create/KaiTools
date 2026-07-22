@@ -13,6 +13,30 @@ struct PickerShortcut(Mutex<Option<Shortcut>>);
 /// 关闭主窗口时的行为："ask"（弹窗询问）/ "minimize"（最小化到托盘）/ "quit"（直接退出）
 struct CloseMode(Mutex<String>);
 
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AppInfo {
+    app_name: String,
+    app_version: String,
+    tauri_version: String,
+    os: String,
+}
+
+#[tauri::command]
+fn get_app_info(app: tauri::AppHandle) -> AppInfo {
+    let package = app.package_info();
+    AppInfo {
+        app_name: package.name.clone(),
+        app_version: package.version.to_string(),
+        tauri_version: tauri::VERSION.to_string(),
+        os: if cfg!(target_os = "windows") {
+            "Windows".to_string()
+        } else {
+            std::env::consts::OS.to_string()
+        },
+    }
+}
+
 #[tauri::command]
 fn set_close_mode(app: tauri::AppHandle, mode: String) {
     let m = match mode.as_str() {
@@ -39,7 +63,7 @@ fn parse_shortcut(s: &str) -> Option<Shortcut> {
 /// 注册 / 更新 / 禁用屏幕取色全局快捷键。
 /// 任何失败都安全吞掉，绝不 panic（避免 release 下 panic=abort 导致进程崩溃退出）。
 #[tauri::command]
-fn set_picker_shortcut(app: tauri::AppHandle, shortcut: String) {
+fn set_picker_shortcut(app: tauri::AppHandle, shortcut: String) -> Result<(), String> {
     let state = app.state::<PickerShortcut>();
     // 先注销旧的（忽略任何错误）
     if let Some(old) = state.0.lock().unwrap().take() {
@@ -47,20 +71,19 @@ fn set_picker_shortcut(app: tauri::AppHandle, shortcut: String) {
     }
     // 空字符串表示禁用
     if shortcut.trim().is_empty() {
-        return;
+        return Ok(());
     }
     match parse_shortcut(&shortcut) {
         Some(sc) => {
             // 注册失败（冲突 / 系统保留 / 非法）时安全忽略，不打断应用
             if app.global_shortcut().register(sc).is_ok() {
                 *state.0.lock().unwrap() = Some(sc);
+                Ok(())
             } else {
-                eprintln!("[picker] 取色快捷键注册失败（可能冲突或被系统保留）：{shortcut}");
+                Err(format!("快捷键 {shortcut} 注册失败，可能已被占用或属于系统保留快捷键"))
             }
         }
-        None => {
-            eprintln!("[picker] 取色快捷键格式无法解析：{shortcut}");
-        }
+        None => Err(format!("快捷键格式无法解析：{shortcut}")),
     }
 }
 
@@ -132,6 +155,7 @@ pub fn run() {
             set_picker_shortcut,
             set_close_mode,
             quit_app,
+            get_app_info,
         ])
         .setup(|app| {
             // 注册窗口显隐快捷键 Alt+Space
@@ -151,9 +175,13 @@ pub fn run() {
                         // 允许直接退出
                         return;
                     }
-                    // ask / minimize：阻止关闭，最小化到托盘
+                    // ask / minimize：阻止系统关闭；ask 交给前端显示选择框。
                     api.prevent_close();
-                    let _ = w.hide();
+                    if mode == "ask" {
+                        let _ = w.emit("request-close-choice", ());
+                    } else {
+                        let _ = w.hide();
+                    }
                 }
             });
 

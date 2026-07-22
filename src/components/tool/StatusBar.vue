@@ -30,11 +30,11 @@ withDefaults(
 
 <style scoped>
 .status-bar {
-  min-height: 30px;
-  font-size: 12px;
+  min-height: 32px;
+  font-size: 13px;
   color: var(--ktool-text-mute);
   border-top: 1px solid var(--ktool-border);
-  background: var(--ktool-surface);
+  background: transparent;
 }
 .status-bar-dot {
   width: 7px;
@@ -44,13 +44,13 @@ withDefaults(
   flex-shrink: 0;
 }
 .status-bar-dot--success {
-  background: #2ba24c;
+  background: var(--ktool-success);
 }
 .status-bar-dot--error {
   background: var(--ktool-danger);
 }
 .status-bar-dot--warning {
-  background: #d9a23b;
+  background: var(--ktool-warning);
 }
 .status-bar-text {
   line-height: 1.2;

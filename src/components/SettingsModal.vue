@@ -42,7 +42,21 @@
             </n-space>
           </n-radio-group>
         </div>
-        <p class="settings-hint">深色主题自动跟随 Windows 系统设置（当选择"跟随系统"时）。</p>
+        <div class="settings-row mt-3">
+          <span class="settings-label">强调色</span>
+          <n-color-picker
+            :value="themeStore.accentColor"
+            :show-alpha="false"
+            :modes="['hex']"
+            :swatches="accentSwatches"
+            size="small"
+            class="accent-picker"
+            @update:value="onAccentColorChange"
+          />
+          <n-button size="small" quaternary @click="themeStore.resetAccentColor()">
+            恢复默认
+          </n-button>
+        </div>
       </section>
 
       <!-- 窗口与启动 -->
@@ -61,15 +75,10 @@
             </n-space>
           </n-radio-group>
         </div>
-        <p class="settings-hint">
-          选择"询问我"时，点击关闭会弹出选择框（可勾选"不再提示"记住选择）。
-        </p>
         <div class="settings-row mt-3">
           <span class="settings-label">开机自启</span>
           <n-switch :value="autoStartOn" @update:value="onAutoStartChange" />
-          <span class="settings-hint-inline">{{ autoStartOn ? "已开启" : "已关闭" }}</span>
         </div>
-        <p class="settings-hint">登录系统后自动在后台启动 KTool。</p>
       </section>
 
       <!-- 快捷键 -->
@@ -78,7 +87,6 @@
         <div class="settings-row">
           <span class="settings-label">命令面板</span>
           <kbd class="settings-kbd">Ctrl</kbd> + <kbd class="settings-kbd">K</kbd>
-          <span class="settings-hint-inline">打开命令面板，搜索并切换工具</span>
         </div>
       </section>
 
@@ -97,18 +105,12 @@
             {{ recording ? "停止录制" : "录制" }}
           </n-button>
         </div>
-        <p class="settings-hint">
-          全局快捷键，唤起屏幕取色（放大镜跟随光标，单击取色、Esc 取消）。置空则不启用。
-        </p>
         <p v-if="shortcutError" class="shortcut-error">{{ shortcutError }}</p>
       </section>
 
       <!-- 工具显示 -->
       <section class="settings-section">
         <h3 class="settings-h">工具显示</h3>
-        <p class="settings-hint">
-          关闭后该工具将从左侧导航隐藏，仍可在命令面板（Ctrl K）中搜索打开。
-        </p>
         <div class="tool-toggle-grid">
           <div v-for="t in allTools" :key="t.id" class="tool-toggle-item">
             <span class="tool-name">{{ t.name }}</span>
@@ -139,13 +141,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from "vue";
+import { ref, reactive, watch, onMounted, onUnmounted } from "vue";
 import {
   NModal,
   NRadioGroup,
   NRadio,
   NSpace,
   NButton,
+  NColorPicker,
   NInput,
   NSwitch,
 } from "naive-ui";
@@ -155,14 +158,20 @@ import { useHistoryStore } from "@/stores/history";
 import { useSettingsStore, type CloseBehavior } from "@/stores/settings";
 import { tools } from "@/tools/registry";
 import appIcon from "@/assets/brand/ktool-app-icon-ui.png";
+import { invoke } from "@tauri-apps/api/core";
 
-defineProps<{ show: boolean }>();
+const props = defineProps<{ show: boolean }>();
 const emit = defineEmits<{ (e: "update:show", v: boolean): void }>();
 
 const themeStore = useThemeStore();
 const historyStore = useHistoryStore();
 const settings = useSettingsStore();
 const allTools = tools;
+const accentSwatches = ["#4f46e5", "#2563eb", "#0891b2", "#059669", "#d97706", "#e11d48"];
+
+function onAccentColorChange(value: string | null) {
+  if (value) themeStore.setAccentColor(value);
+}
 
 // 开机自启：以系统实际状态为准
 const autoStartOn = ref(settings.data.autoStart);
@@ -198,7 +207,7 @@ function toggleRecord() {
   shortcutError.value = "";
 }
 
-function onRecordKey(e: KeyboardEvent) {
+async function onRecordKey(e: KeyboardEvent) {
   if (!recording.value) return;
   e.preventDefault();
   e.stopPropagation();
@@ -228,21 +237,33 @@ function onRecordKey(e: KeyboardEvent) {
   }
   shortcutError.value = "";
   recording.value = false;
-  settings.setPickerShortcut(combo);
+  try {
+    await invoke("set_picker_shortcut", { shortcut: combo });
+    settings.setPickerShortcut(combo);
+  } catch (error) {
+    shortcutError.value = String(error);
+  }
 }
 
 onMounted(() => {
   window.addEventListener("keydown", onRecordKey, true);
+  window.addEventListener("ktool-app-info", syncAbout);
   syncAutoStart();
+  syncAbout();
 });
-onUnmounted(() => window.removeEventListener("keydown", onRecordKey, true));
+onUnmounted(() => {
+  window.removeEventListener("keydown", onRecordKey, true);
+  window.removeEventListener("ktool-app-info", syncAbout);
+});
 
-const about = {
-  appName: (window as any).__KTOOL_APP_INFO__?.appName ?? "KTool",
-  appVersion: (window as any).__KTOOL_APP_INFO__?.appVersion ?? "",
-  tauriVersion: (window as any).__KTOOL_APP_INFO__?.tauriVersion ?? "",
-  os: (window as any).__KTOOL_APP_INFO__?.os ?? "Windows",
-};
+const about = reactive({ appName: "KTool", appVersion: "", tauriVersion: "", os: "Windows" });
+function syncAbout() {
+  const info = (window as any).__KTOOL_APP_INFO__;
+  if (info) Object.assign(about, info);
+}
+watch(() => props.show, (show) => {
+  if (show) syncAbout();
+});
 </script>
 
 <style scoped>
@@ -273,11 +294,6 @@ const about = {
   font-size: 13px;
   color: var(--ktool-text);
   min-width: 64px;
-}
-.settings-hint {
-  font-size: 12px;
-  color: var(--ktool-text-mute);
-  margin: 8px 0 0;
 }
 .settings-hint-inline {
   font-size: 12px;
@@ -325,6 +341,9 @@ const about = {
 .shortcut-input {
   flex: 1;
   max-width: 240px;
+}
+.accent-picker {
+  width: 220px;
 }
 .shortcut-error {
   font-size: 12px;

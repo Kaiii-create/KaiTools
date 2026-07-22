@@ -36,7 +36,7 @@
         <code class="regex-match-val">{{ m.value }}</code>
         <span class="regex-match-pos">@{{ m.index }}</span>
         <span v-if="m.groups.length" class="regex-match-groups">
-          <code v-for="g in m.groups" :key="g.i" class="regex-group">${{ g.i + 1 }}={{ g.v || "∅" }}</code>
+          <code v-for="g in m.groups" :key="g.i" class="regex-group">${{ g.i + 1 }}={{ g.v === undefined ? "未匹配" : g.v === "" ? "空字符串" : g.v }}</code>
         </span>
       </div>
     </div>
@@ -44,15 +44,23 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import { NInput, NCheckbox, NCheckboxGroup, NTag } from "naive-ui";
 import ToolPage from "@/components/tool/ToolPage.vue";
 import ToolToolbar from "@/components/tool/ToolToolbar.vue";
 import EditorPane from "@/components/tool/EditorPane.vue";
+import { parseHistoryInput, useToolHistory } from "@/composables/useToolHistory";
 
 const pattern = ref("");
 const flagArr = ref<string[]>(["g"]);
 const text = ref("");
+const history = useToolHistory("regex-tester", "正则测试器", (item) => {
+  const saved = parseHistoryInput<{ pattern: string; flags: string[]; text: string }>(item.input);
+  if (!saved) return;
+  pattern.value = saved.pattern;
+  flagArr.value = saved.flags;
+  text.value = saved.text;
+});
 
 const flags = computed(() => flagArr.value.join(""));
 
@@ -73,24 +81,29 @@ function escapeHtml(s: string): string {
 interface MatchItem {
   index: number;
   value: string;
-  groups: { i: number; v: string }[];
+  groups: { i: number; v: string | undefined }[];
 }
 
-const matches = computed<MatchItem[]>(() => {
+const rawMatches = computed<RegExpExecArray[]>(() => {
   if (!pattern.value || errorMsg.value) return [];
-  const f = flags.value.includes("g") ? flags.value : flags.value + "g";
   let re: RegExp;
   try {
-    re = new RegExp(pattern.value, f);
+    re = new RegExp(pattern.value, flags.value);
   } catch {
     return [];
   }
+  if (re.global) return Array.from(text.value.matchAll(re));
+  const match = re.exec(text.value);
+  return match ? [match] : [];
+});
+
+const matches = computed<MatchItem[]>(() => {
   const out: MatchItem[] = [];
-  for (const m of text.value.matchAll(re)) {
+  for (const m of rawMatches.value) {
     out.push({
       index: m.index ?? 0,
       value: m[0],
-      groups: Array.from(m.slice(1)).map((g, i) => ({ i, v: g ?? "" })),
+      groups: Array.from(m.slice(1)).map((g, i) => ({ i, v: g })),
     });
   }
   return out;
@@ -98,16 +111,9 @@ const matches = computed<MatchItem[]>(() => {
 
 const highlighted = computed(() => {
   if (!pattern.value || errorMsg.value) return escapeHtml(text.value);
-  const f = flags.value.includes("g") ? flags.value : flags.value + "g";
-  let re: RegExp;
-  try {
-    re = new RegExp(pattern.value, f);
-  } catch {
-    return escapeHtml(text.value);
-  }
   let result = "";
   let last = 0;
-  for (const m of text.value.matchAll(re)) {
+  for (const m of rawMatches.value) {
     const start = m.index ?? 0;
     result += escapeHtml(text.value.slice(last, start));
     result += `<mark>${escapeHtml(m[0])}</mark>`;
@@ -116,6 +122,15 @@ const highlighted = computed(() => {
   result += escapeHtml(text.value.slice(last));
   return result;
 });
+
+watch([pattern, flagArr, text], () => {
+  if (!pattern.value || !text.value || errorMsg.value) return;
+  history.recordDebounced({
+    title: `/${pattern.value.slice(0, 36)}/${flags.value} · ${matches.value.length} 处`,
+    input: JSON.stringify({ pattern: pattern.value, flags: flagArr.value, text: text.value }),
+    output: matches.value.map((match) => `${match.index}: ${match.value}`).join("\n"),
+  }, 1200);
+}, { deep: true });
 </script>
 
 <style scoped>

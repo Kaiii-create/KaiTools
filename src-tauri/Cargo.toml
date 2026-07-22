@@ -1,7 +1,7 @@
 [package]
 name = "ktool"
 version = "0.1.0"
-description = "KTool - 开子工具箱，轻量级开发工具集"
+description = "KTool - 开发者工具箱，轻量级开发工具集"
 authors = ["kai"]
 edition = "2021"
 rust-version = "1.77"
@@ -22,7 +22,7 @@ tauri-plugin-store = "2"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-autostart = "2"
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde_json = { version = "1", features = ["arbitrary_precision", "preserve_order"] }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "stream"] }
 windows = { version = "0.52", features = [
     "Win32_Foundation",

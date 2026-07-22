@@ -1,0 +1,6 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 查看已有问题
+    url: https://github.com/Kaiii-create/KaiTools/issues
+    about: 提交前请先搜索是否已有相同建议或问题。
+

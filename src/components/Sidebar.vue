@@ -10,7 +10,7 @@
         @focus="onSearchFocus"
       >
         <template #prefix>
-          <n-icon :size="15" class="text-[var(--ktool-text-mute)]">
+          <n-icon :size="16" class="text-[var(--ktool-text-mute)]">
             <SearchOutline />
           </n-icon>
         </template>
@@ -31,11 +31,11 @@
           :class="{ 'nav-item--active': t.id === activeId }"
           @click="onSelect(t.id)"
         >
-          <span class="nav-item-icon" :style="{ color: t.accent }"><n-icon :component="t.icon" :size="18" /></span>
+          <span class="nav-item-icon"><n-icon :component="t.icon" :size="16" /></span>
           <span class="nav-item-name truncate">{{ t.name }}</span>
         </button>
         <div v-if="filtered.length === 0" class="nav-empty">
-          <n-icon :size="22"><SearchOutline /></n-icon>
+          <n-icon :size="20"><SearchOutline /></n-icon>
           <span>没有匹配的工具</span>
         </div>
       </template>
@@ -52,7 +52,7 @@
             :class="{ 'nav-item--active': t.id === activeId }"
             @click="onSelect(t.id)"
           >
-            <span class="nav-item-icon" :style="{ color: t.accent }"><n-icon :component="t.icon" :size="18" /></span>
+            <span class="nav-item-icon"><n-icon :component="t.icon" :size="16" /></span>
             <span class="nav-item-name truncate">{{ t.name }}</span>
           </button>
         </div>
@@ -62,7 +62,7 @@
     <!-- 底部：设置 -->
     <div class="sidebar-footer px-2 pb-3 pt-2 shrink-0">
       <button class="sidebar-settings" @click="$emit('open-settings')">
-        <n-icon :size="18"><SettingsOutline /></n-icon>
+        <n-icon :size="16"><SettingsOutline /></n-icon>
         <span>设置</span>
       </button>
     </div>
@@ -131,14 +131,13 @@ void props;
 
 <style scoped>
 .sidebar {
-  width: 232px;
+  width: 208px;
   flex-shrink: 0;
-  background: var(--ktool-surface);
-  border-right: 1px solid var(--ktool-border);
+  background: var(--ktool-bg);
 }
 
 .search-kbd {
-  font-size: 10px;
+  font-size: 11px;
   font-family: inherit;
   color: var(--ktool-text-mute);
   background: var(--ktool-surface-2);
@@ -155,8 +154,8 @@ void props;
 .nav-group-label {
   display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 6px 10px 4px;
+  gap: 4px;
+  padding: 8px 12px 4px;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -166,11 +165,12 @@ void props;
 
 /* —— 项 —— */
 .nav-item {
+  position: relative;
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 7px 10px;
+  gap: 8px;
+  padding: 8px 12px;
   border-radius: var(--ktool-radius);
   border: 1px solid transparent;
   background: transparent;
@@ -188,16 +188,24 @@ void props;
   background: var(--ktool-brand-soft);
   color: var(--ktool-brand);
 }
+.nav-item--active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--ktool-brand);
+}
 .nav-item-icon {
   display: flex;
-  color: var(--tool-accent, var(--ktool-text-mute));
+  color: var(--ktool-text-mute);
   flex-shrink: 0;
-  transition: transform var(--ktool-duration) var(--ktool-ease),
-    color var(--ktool-duration) var(--ktool-ease);
+  transition: color var(--ktool-duration) var(--ktool-ease);
 }
-.nav-item:hover .nav-item-icon,
 .nav-item--active .nav-item-icon {
-  transform: scale(1.06);
+  color: var(--ktool-brand);
 }
 .nav-item-name {
   font-size: 13px;
@@ -210,10 +218,10 @@ void props;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 28px 12px;
+  gap: 8px;
+  padding: 24px 12px;
   color: var(--ktool-text-mute);
-  font-size: 12.5px;
+  font-size: 13px;
 }
 
 /* —— 底部设置 —— */
@@ -224,8 +232,8 @@ void props;
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 8px 10px;
+  gap: 8px;
+  padding: 8px 12px;
   border-radius: var(--ktool-radius);
   background: transparent;
   border: 1px solid transparent;

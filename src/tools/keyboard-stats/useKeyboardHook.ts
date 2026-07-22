@@ -1,34 +1,44 @@
-// 键盘钩子 composable：封装启动/停止全局钩子 + 事件订阅
-// 统计数据持久化到 localStorage，主窗口与小插件窗口共享同一份 key
+// 键盘统计单例：主窗口负责记录并持久化，小插件只同步展示，避免多窗口重复计数。
 
-import { ref, reactive, computed } from "vue";
+import { computed, reactive, ref } from "vue";
 
 const KEY_TODAY = "ktool_keyboard_today";
 const KEY_ALL = "ktool_keyboard_all";
+const KEY_DAILY = "ktool_keyboard_daily";
 const KEY_HOTKEYS = "ktool_keyboard_hotkeys";
+const KEY_ENABLED = "ktool_keyboard_enabled";
 
-export function useKeyboardHook() {
+export interface DailyKeyboardSummary {
+  date: string;
+  total: number;
+  counts: Record<string, number>;
+}
+
+function createKeyboardHook() {
   const isListening = ref(false);
   const todayCounts = reactive<Record<string, number>>({});
   const allTimeCounts = reactive<Record<string, number>>({});
+  const dailyCounts = reactive<Record<string, Record<string, number>>>({});
   const hotkeys = reactive<Record<string, number>>({});
   const todayStart = ref(Date.now());
+  const todayDay = ref(dayKey(Date.now()));
   const installDate = ref(Date.now());
+  let loaded = false;
 
-  const todayTotal = computed(() =>
-    Object.values(todayCounts).reduce((a, b) => a + b, 0)
+  const todayTotal = computed(() => sumCounts(todayCounts));
+  const allTimeTotal = computed(() => sumCounts(allTimeCounts));
+  const activeKeys = computed(() => Object.keys(todayCounts).filter((key) => todayCounts[key] > 0).length);
+  const dailySummaries = computed<DailyKeyboardSummary[]>(() =>
+    Object.entries(dailyCounts)
+      .map(([date, counts]) => ({ date, counts, total: sumCounts(counts) }))
+      .sort((a, b) => b.date.localeCompare(a.date))
   );
-  const allTimeTotal = computed(() =>
-    Object.values(allTimeCounts).reduce((a, b) => a + b, 0)
-  );
-  const activeKeys = computed(() => Object.keys(todayCounts).length);
 
-  // 供可视化用：按 code 的今日次数（小写归一）
   const countsByCode = computed<Record<string, number>>(() => {
     const out: Record<string, number> = {};
-    for (const [k, v] of Object.entries(todayCounts)) {
-      const code = codeFromKey(k);
-      out[code] = (out[code] || 0) + v;
+    for (const [key, value] of Object.entries(todayCounts)) {
+      const code = codeFromKey(key);
+      out[code] = (out[code] || 0) + value;
     }
     return out;
   });
@@ -38,114 +48,172 @@ export function useKeyboardHook() {
     if (key === "\n") return "enter";
     if (key === "\t") return "tab";
     if (key === "\u0008") return "backspace";
-    if (key.length === 1) return key.toLowerCase();
     return key.toLowerCase();
   }
 
-  // 回调：外部（可视化组件）监听每一次按键触发特效
   const listeners = new Set<(combo: string, code: string) => void>();
   function onKey(cb: (combo: string, code: string) => void) {
     listeners.add(cb);
     return () => listeners.delete(cb);
   }
 
-  function handleKeyboardEvent(combo: string) {
-    const parts = combo.split("+");
-    const key = parts[parts.length - 1];
-    const normalizedKey = key === " " ? "Space" : key;
+  function beginCurrentDay() {
+    clearRecord(todayCounts);
+    todayStart.value = Date.now();
+    todayDay.value = dayKey(todayStart.value);
+    const stored = dailyCounts[todayDay.value];
+    if (stored) Object.assign(todayCounts, stored);
+  }
 
-    todayCounts[normalizedKey] = (todayCounts[normalizedKey] || 0) + 1;
-    allTimeCounts[normalizedKey] = (allTimeCounts[normalizedKey] || 0) + 1;
+  function ensureCurrentDay() {
+    if (todayDay.value !== dayKey(Date.now())) beginCurrentDay();
+  }
+
+  function handleKeyboardEvent(combo: string, persist = true) {
+    ensureCurrentDay();
+    const parts = combo.split("+");
+    const rawKey = parts[parts.length - 1] || combo;
+    const key = rawKey === " " ? "space" : rawKey.toLowerCase();
+
+    todayCounts[key] = (todayCounts[key] || 0) + 1;
+    allTimeCounts[key] = (allTimeCounts[key] || 0) + 1;
+    if (!dailyCounts[todayDay.value]) dailyCounts[todayDay.value] = {};
+    dailyCounts[todayDay.value][key] = (dailyCounts[todayDay.value][key] || 0) + 1;
 
     if (parts.length > 1) {
       hotkeys[combo] = (hotkeys[combo] || 0) + 1;
-      const keys = Object.keys(hotkeys);
-      if (keys.length > 30) delete hotkeys[keys[0]];
+      const combos = Object.keys(hotkeys);
+      if (combos.length > 50) delete hotkeys[combos[0]];
     }
 
-    const code = codeFromKey(normalizedKey);
-    listeners.forEach((cb) => cb(combo, code));
-
-    saveToStorage();
+    listeners.forEach((cb) => cb(combo, codeFromKey(key)));
+    if (persist) saveToStorage();
   }
 
   function saveToStorage() {
     try {
       localStorage.setItem(
         KEY_TODAY,
-        JSON.stringify({ counts: todayCounts, start: todayStart.value })
+        JSON.stringify({ counts: todayCounts, start: todayStart.value, day: todayDay.value })
       );
       localStorage.setItem(
         KEY_ALL,
         JSON.stringify({ counts: allTimeCounts, installDate: installDate.value })
       );
+      localStorage.setItem(KEY_DAILY, JSON.stringify(dailyCounts));
       localStorage.setItem(KEY_HOTKEYS, JSON.stringify(hotkeys));
-    } catch {}
+    } catch {
+      // 存储不可用时仍允许当前会话继续统计。
+    }
   }
 
   function loadFromStorage() {
+    if (loaded) return;
+    loaded = true;
     try {
+      const storedDaily = JSON.parse(localStorage.getItem(KEY_DAILY) || "{}");
+      if (storedDaily && typeof storedDaily === "object") Object.assign(dailyCounts, storedDaily);
+
       const today = JSON.parse(localStorage.getItem(KEY_TODAY) || "{}");
-      if (today.counts) {
-        Object.assign(todayCounts, today.counts);
-        todayStart.value = today.start || Date.now();
+      const storedDay = today.day || (today.start ? dayKey(today.start) : "");
+      const currentDay = dayKey(Date.now());
+      if (today.counts && storedDay) {
+        if (!dailyCounts[storedDay]) dailyCounts[storedDay] = { ...today.counts };
+        if (storedDay === currentDay) {
+          Object.assign(todayCounts, today.counts);
+          todayStart.value = today.start || Date.now();
+          todayDay.value = storedDay;
+        }
       }
+
       const all = JSON.parse(localStorage.getItem(KEY_ALL) || "{}");
-      if (all.counts) {
-        Object.assign(allTimeCounts, all.counts);
-        installDate.value = all.installDate || Date.now();
-      }
-      const hot = JSON.parse(localStorage.getItem(KEY_HOTKEYS) || "{}");
-      Object.assign(hotkeys, hot);
-    } catch {}
+      if (all.counts) Object.assign(allTimeCounts, all.counts);
+      installDate.value = all.installDate || Date.now();
+
+      const storedHotkeys = JSON.parse(localStorage.getItem(KEY_HOTKEYS) || "{}");
+      if (storedHotkeys && typeof storedHotkeys === "object") Object.assign(hotkeys, storedHotkeys);
+
+      if (todayDay.value !== currentDay) beginCurrentDay();
+      if (!dailyCounts[currentDay]) dailyCounts[currentDay] = { ...todayCounts };
+    } catch {
+      beginCurrentDay();
+    }
   }
 
   let unlisten: (() => void) | null = null;
 
-  async function start() {
-    if (isListening.value) return;
-    const { invoke } = await import("@tauri-apps/api/core");
-    const { listen } = await import("@tauri-apps/api/event");
-    unlisten = await listen<string>("keyboard-event", (event) => {
-      handleKeyboardEvent(event.payload);
-    });
-    await invoke("start_keyboard_hook");
-    isListening.value = true;
+  function shouldAutoStart() {
+    try {
+      return localStorage.getItem(KEY_ENABLED) !== "false";
+    } catch {
+      return true;
+    }
   }
 
-  async function stop() {
-    if (!isListening.value) return;
+  async function start() {
+    if (isListening.value) return;
+    loadFromStorage();
+    const { invoke } = await import("@tauri-apps/api/core");
+    const { listen } = await import("@tauri-apps/api/event");
+    unlisten = await listen<string>("keyboard-event", (event) => handleKeyboardEvent(event.payload));
+    try {
+      await invoke("start_keyboard_hook");
+      isListening.value = true;
+      localStorage.setItem(KEY_ENABLED, "true");
+    } catch (error) {
+      unlisten?.();
+      unlisten = null;
+      throw error;
+    }
+  }
+
+  async function stop(savePreference = true) {
+    if (!isListening.value && !unlisten) return;
     isListening.value = false;
     try {
       const { invoke } = await import("@tauri-apps/api/core");
       await invoke("stop_keyboard_hook");
-    } catch {}
-    if (unlisten) {
-      unlisten();
-      unlisten = null;
+    } catch {
+      // 非 Tauri 预览环境忽略。
+    }
+    unlisten?.();
+    unlisten = null;
+    if (savePreference) {
+      try {
+        localStorage.setItem(KEY_ENABLED, "false");
+      } catch {}
     }
   }
 
-  // 仅订阅事件（小插件窗口用：钩子由主窗口启动，这里只收事件）
+  async function shutdown() {
+    await stop(false);
+  }
+
+  // 小插件接收相同事件用于动画和即时数字，但不写存储，避免和主窗口重复累计。
   async function subscribeOnly() {
+    if (unlisten) return;
+    loadFromStorage();
     const { listen } = await import("@tauri-apps/api/event");
-    unlisten = await listen<string>("keyboard-event", (event) => {
-      handleKeyboardEvent(event.payload);
-    });
+    unlisten = await listen<string>("keyboard-event", (event) => handleKeyboardEvent(event.payload, false));
     isListening.value = true;
   }
 
   function resetToday() {
-    for (const k of Object.keys(todayCounts)) delete todayCounts[k];
+    ensureCurrentDay();
+    clearRecord(todayCounts);
+    dailyCounts[todayDay.value] = {};
     todayStart.value = Date.now();
     saveToStorage();
   }
 
   function resetAll() {
-    for (const k of Object.keys(todayCounts)) delete todayCounts[k];
-    for (const k of Object.keys(allTimeCounts)) delete allTimeCounts[k];
-    for (const k of Object.keys(hotkeys)) delete hotkeys[k];
+    clearRecord(todayCounts);
+    clearRecord(allTimeCounts);
+    clearRecord(dailyCounts);
+    clearRecord(hotkeys);
     todayStart.value = Date.now();
+    todayDay.value = dayKey(todayStart.value);
+    dailyCounts[todayDay.value] = {};
     installDate.value = Date.now();
     saveToStorage();
   }
@@ -154,6 +222,8 @@ export function useKeyboardHook() {
     isListening,
     todayCounts,
     allTimeCounts,
+    dailyCounts,
+    dailySummaries,
     hotkeys,
     todayStart,
     installDate,
@@ -164,9 +234,32 @@ export function useKeyboardHook() {
     onKey,
     start,
     stop,
+    shutdown,
+    shouldAutoStart,
     subscribeOnly,
     loadFromStorage,
     resetToday,
     resetAll,
   };
+}
+
+function sumCounts(counts: Record<string, number>): number {
+  return Object.values(counts).reduce((sum, count) => sum + count, 0);
+}
+
+function clearRecord(record: Record<string, unknown>) {
+  for (const key of Object.keys(record)) delete record[key];
+}
+
+function dayKey(timestamp: number): string {
+  const date = new Date(timestamp);
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+const keyboardHook = createKeyboardHook();
+
+export function useKeyboardHook() {
+  return keyboardHook;
 }

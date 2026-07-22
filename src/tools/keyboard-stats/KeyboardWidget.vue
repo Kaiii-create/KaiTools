@@ -1,23 +1,54 @@
 <template>
-  <div
-    class="kbd-widget"
-    :style="rootStyle"
-  >
+  <div class="kbd-widget" :class="{ 'is-mini': mini }" :style="rootStyle">
     <!-- 拖动条 + 工具按钮 -->
     <div class="kw-bar" data-tauri-drag-region>
       <span class="kw-title" data-tauri-drag-region>⌨ 键盘</span>
       <span class="kw-count" data-tauri-drag-region>{{ hook.todayTotal.value }}</span>
       <div class="kw-actions">
-        <button class="kw-btn" title="设置" @click="showSettings = !showSettings">⚙</button>
-        <button class="kw-btn" title="置顶" :class="{ on: alwaysOnTop }" @click="toggleTop">📌</button>
-        <button class="kw-btn kw-close" title="关闭" @click="closeSelf">✕</button>
+        <button v-if="!mini" class="kw-btn" title="设置" @click="showSettings = !showSettings">
+          <n-icon :component="SettingsOutline" :size="14" />
+        </button>
+        <button class="kw-btn" :title="mini ? '展开键盘' : '迷你模式'" @click="toggleMini">
+          <n-icon :component="mini ? ExpandOutline : ContractOutline" :size="14" />
+        </button>
+        <button class="kw-btn" title="始终置顶" :class="{ on: alwaysOnTop }" @click="toggleTop">
+          <n-icon :component="PinOutline" :size="14" />
+        </button>
+        <button
+          class="kw-btn"
+          :class="{ on: locked }"
+          :title="locked ? '已锁定，点击解锁' : '锁定，防止误关'"
+          @click="locked = !locked"
+        >
+          <n-icon :component="locked ? LockClosedOutline : LockOpenOutline" :size="14" />
+        </button>
+        <button
+          class="kw-btn kw-close"
+          :disabled="locked"
+          :title="locked ? '请先解锁' : '关闭'"
+          @click="closeSelf"
+        >
+          <n-icon :component="CloseOutline" :size="15" />
+        </button>
       </div>
     </div>
 
+    <!-- 迷你模式：只保留关键状态和最近按键 -->
+    <div v-if="mini" class="kw-mini" data-tauri-drag-region>
+      <span class="kw-live" :class="{ on: hook.isListening.value }">
+        <i />{{ hook.isListening.value ? "统计中" : "已暂停" }}
+      </span>
+      <span class="kw-last">
+        最近
+        <kbd>{{ lastKey }}</kbd>
+      </span>
+      <span class="kw-mini-total">今日 {{ hook.todayTotal.value }}</span>
+    </div>
+
     <!-- 键盘可视化（缩放以适配尺寸） -->
-    <div class="kw-board" :style="boardStyle">
+    <div v-else class="kw-board" :style="boardStyle">
       <div class="kw-scale" :style="{ transform: `scale(${scale})` }">
-        <KeyboardVisual :counts="hook.countsByCode.value" :accent="accent" :show-count="showCount" compact :active-code="activeCode" :active-seq="activeSeq" />
+        <KeyboardVisual :counts="hook.countsByCode.value" :show-count="showCount" compact :active-code="activeCode" :active-seq="activeSeq" />
       </div>
     </div>
 
@@ -39,8 +70,6 @@
         <span class="kw-val">{{ Math.round(opacity * 100) }}%</span>
       </div>
       <div class="kw-row">
-        <label>主题色</label>
-        <input type="color" v-model="accent" />
         <label class="kw-check">
           <input type="checkbox" v-model="showCount" /> 显示次数
         </label>
@@ -49,6 +78,9 @@
         <label class="kw-check">
           <input type="checkbox" v-model="alwaysOnTop" @change="applyAlwaysOnTop" /> 始终置顶
         </label>
+        <label class="kw-check">
+          <input type="checkbox" v-model="locked" /> 锁定防误关
+        </label>
       </div>
     </div>
   </div>
@@ -56,12 +88,23 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, watch } from "vue";
+import { NIcon } from "naive-ui";
+import {
+  CloseOutline,
+  ContractOutline,
+  ExpandOutline,
+  LockClosedOutline,
+  LockOpenOutline,
+  PinOutline,
+  SettingsOutline,
+} from "@vicons/ionicons5";
 import KeyboardVisual from "./KeyboardVisual.vue";
 import { useKeyboardHook } from "./useKeyboardHook";
 
 const hook = useKeyboardHook();
 const activeCode = ref<string | null>(null);
 const activeSeq = ref(0);
+const lastKey = ref("—");
 
 const SETTINGS_KEY = "ktool_kbd_widget_settings";
 const showSettings = ref(false);
@@ -70,9 +113,10 @@ const state = reactive({
   width: 520,
   height: 210,
   opacity: 0.95,
-  accent: "#6366f1",
   showCount: true,
   alwaysOnTop: true,
+  locked: false,
+  mini: false,
 });
 
 const width = computed({
@@ -87,10 +131,6 @@ const opacity = computed({
   get: () => state.opacity,
   set: (v) => { state.opacity = v; },
 });
-const accent = computed({
-  get: () => state.accent,
-  set: (v) => { state.accent = v; },
-});
 const showCount = computed({
   get: () => state.showCount,
   set: (v) => { state.showCount = v; },
@@ -98,6 +138,14 @@ const showCount = computed({
 const alwaysOnTop = computed({
   get: () => state.alwaysOnTop,
   set: (v) => { state.alwaysOnTop = v; },
+});
+const locked = computed({
+  get: () => state.locked,
+  set: (v) => { state.locked = v; },
+});
+const mini = computed({
+  get: () => state.mini,
+  set: (v) => { state.mini = v; },
 });
 
 const rootStyle = computed(() => ({
@@ -129,7 +177,11 @@ async function applyWindowSize() {
     const { getCurrentWebviewWindow } = await import("@tauri-apps/api/webviewWindow");
     const { LogicalSize } = await import("@tauri-apps/api/dpi");
     const w = getCurrentWebviewWindow();
-    await w.setSize(new LogicalSize(state.width, state.height));
+    await w.setSize(
+      state.mini
+        ? new LogicalSize(300, 82)
+        : new LogicalSize(state.width, state.height)
+    );
   } catch {}
 }
 
@@ -146,7 +198,15 @@ async function toggleTop() {
   await applyAlwaysOnTop();
 }
 
+async function toggleMini() {
+  state.mini = !state.mini;
+  showSettings.value = false;
+  await applyWindowSize();
+  saveSettings();
+}
+
 async function closeSelf() {
+  if (state.locked) return;
   try {
     const { getCurrentWebviewWindow } = await import("@tauri-apps/api/webviewWindow");
     await getCurrentWebviewWindow().close();
@@ -155,14 +215,14 @@ async function closeSelf() {
 
 // 尺寸变更时同步窗口 + 持久化
 watch(
-  () => [state.width, state.height],
+  () => [state.width, state.height, state.mini],
   () => {
     applyWindowSize();
     saveSettings();
   }
 );
 watch(
-  () => [state.opacity, state.accent, state.showCount, state.alwaysOnTop],
+  () => [state.opacity, state.showCount, state.alwaysOnTop, state.locked, state.mini],
   () => saveSettings()
 );
 
@@ -173,11 +233,27 @@ onMounted(async () => {
   hook.onKey((_combo, code) => {
     activeCode.value = code;
     activeSeq.value++;
+    lastKey.value = formatKey(code);
   });
   await hook.subscribeOnly();
   await applyWindowSize();
   await applyAlwaysOnTop();
 });
+
+function formatKey(code: string) {
+  const names: Record<string, string> = {
+    space: "Space",
+    enter: "Enter",
+    numpadenter: "Num Enter",
+    backspace: "Backspace",
+    escape: "Esc",
+    arrowup: "↑",
+    arrowdown: "↓",
+    arrowleft: "←",
+    arrowright: "→",
+  };
+  return names[code] || (code.length === 1 ? code.toUpperCase() : code);
+}
 </script>
 
 <style scoped>
@@ -186,13 +262,13 @@ onMounted(async () => {
   height: 100vh;
   border-radius: 14px;
   overflow: hidden;
-  background: rgba(15, 17, 23, 0.82);
+  background: color-mix(in srgb, var(--ktool-surface) 94%, transparent);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--ktool-border-strong);
   display: flex;
   flex-direction: column;
-  color: #fff;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  color: var(--ktool-text);
+  box-shadow: var(--ktool-shadow-lg);
 }
 .kw-bar {
   height: 30px;
@@ -202,8 +278,8 @@ onMounted(async () => {
   gap: 8px;
   padding: 0 10px;
   cursor: grab;
-  background: rgba(255, 255, 255, 0.04);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--ktool-surface-2);
+  border-bottom: 1px solid var(--ktool-border);
 }
 .kw-bar:active {
   cursor: grabbing;
@@ -211,12 +287,12 @@ onMounted(async () => {
 .kw-title {
   font-size: 12px;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--ktool-text-soft);
 }
 .kw-count {
   font-size: 12px;
   font-weight: 800;
-  color: v-bind(accent);
+  color: var(--ktool-brand);
 }
 .kw-actions {
   margin-left: auto;
@@ -228,8 +304,8 @@ onMounted(async () => {
   height: 22px;
   border: none;
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.75);
+  background: var(--ktool-surface-3);
+  color: var(--ktool-text-soft);
   font-size: 12px;
   cursor: pointer;
   display: flex;
@@ -238,15 +314,68 @@ onMounted(async () => {
   transition: background 0.15s ease;
 }
 .kw-btn:hover {
-  background: rgba(255, 255, 255, 0.14);
+  background: var(--ktool-brand-soft);
 }
 .kw-btn.on {
-  background: v-bind(accent);
-  color: #fff;
+  background: var(--ktool-brand);
+  color: var(--ktool-brand-contrast);
 }
 .kw-close:hover {
   background: #ef4444;
   color: #fff;
+}
+.kw-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+.kw-btn:disabled:hover {
+  background: var(--ktool-surface-3);
+  color: var(--ktool-text-soft);
+}
+.kw-mini {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 12px;
+  color: var(--ktool-text-mute);
+  font-size: 11px;
+  cursor: grab;
+}
+.kw-live,
+.kw-last {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.kw-live i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ktool-text-mute);
+}
+.kw-live.on i {
+  background: var(--ktool-success);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ktool-success) 14%, transparent);
+}
+.kw-last kbd {
+  max-width: 70px;
+  overflow: hidden;
+  padding: 2px 5px;
+  border: 1px solid var(--ktool-border);
+  border-radius: 4px;
+  background: var(--ktool-surface-2);
+  color: var(--ktool-text-soft);
+  font-family: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kw-mini-total {
+  margin-left: auto;
+  color: var(--ktool-brand);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 .kw-board {
   flex: 1;
@@ -264,8 +393,8 @@ onMounted(async () => {
 .kw-settings {
   flex: 0 0 auto;
   padding: 8px 12px 10px;
-  background: rgba(0, 0, 0, 0.35);
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--ktool-surface-2);
+  border-top: 1px solid var(--ktool-border);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -275,7 +404,7 @@ onMounted(async () => {
   align-items: center;
   gap: 8px;
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--ktool-text-soft);
 }
 .kw-row > label {
   width: 42px;
@@ -283,7 +412,7 @@ onMounted(async () => {
 }
 .kw-row input[type="range"] {
   flex: 1;
-  accent-color: v-bind(accent);
+  accent-color: var(--ktool-brand);
 }
 .kw-val {
   width: 40px;
@@ -298,6 +427,6 @@ onMounted(async () => {
   cursor: pointer;
 }
 .kw-check input {
-  accent-color: v-bind(accent);
+  accent-color: var(--ktool-brand);
 }
 </style>

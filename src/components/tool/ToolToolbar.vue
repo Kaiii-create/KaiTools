@@ -1,9 +1,13 @@
 <template>
   <div
     class="tool-toolbar flex items-center gap-2"
-    :class="[bordered ? 'tool-toolbar--bordered' : '', padded ? 'px-4' : '']"
+    :class="[
+      bordered ? 'tool-toolbar--bordered' : '',
+      padded ? 'px-4' : '',
+      variant === 'subtle' ? 'tool-toolbar--subtle' : '',
+    ]"
   >
-    <div class="tool-toolbar-main flex items-center gap-2 flex-wrap min-w-0">
+    <div class="tool-toolbar-main flex items-center gap-1 min-w-0">
       <slot />
     </div>
     <div class="flex-1" />
@@ -21,8 +25,10 @@ withDefaults(
     bordered?: boolean;
     /** 是否带左右内边距 */
     padded?: boolean;
+    /** plain 用于通栏，subtle 用于编辑器工作区内的设置条 */
+    variant?: "plain" | "subtle";
   }>(),
-  { bordered: true, padded: true }
+  { bordered: false, padded: true, variant: "subtle" }
 );
 </script>
 
@@ -32,8 +38,15 @@ withDefaults(
   padding-top: 8px;
   padding-bottom: 8px;
   background: var(--ktool-surface);
+  overflow: hidden;
 }
 .tool-toolbar--bordered {
   border-bottom: 1px solid var(--ktool-border);
+}
+.tool-toolbar--subtle {
+  padding-right: 12px;
+  padding-left: 12px;
+  border-radius: var(--ktool-radius-md);
+  background: var(--ktool-surface-2);
 }
 </style>

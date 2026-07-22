@@ -1,147 +1,110 @@
 export interface KeyDef {
-  code: string; // 与后端 vk token 一致的稳定标识
+  code: string;
   label: string;
-  w?: number; // 相对宽度（flex）
-  hot?: boolean; // 修饰键高亮色
-  accent?: boolean; // 主题色
+  w?: number;
+  h?: number;
+  x?: number;
+  y?: number;
+  spacer?: boolean;
 }
 
-/**
- * 把后端发来的组合键字符串归一化为“最终按键 token”。
- * 后端保证 token 与布局 code 一致，这里只做少量兼容与统一小写。
- */
-export function normalizeCombo(combo: string): string {
-  const parts = combo.split("+");
-  let key = parts[parts.length - 1];
-  if (!key) key = parts[0] ?? ""; // 兼容纯修饰键（旧数据）
-  if (key === " ") return "space";
-  if (key === "\n") return "enter";
-  if (key === "\t") return "tab";
-  if (key === "") return "backspace";
-  if (key.length === 1) return key.toLowerCase();
-  return key.toLowerCase();
-}
+const gap = (w = 0.65): KeyDef => ({ code: `gap-${w}`, label: "", w, spacer: true });
 
-// 紧凑布局（无小键盘，60% 配列）
+/** 标准 ANSI 主键区，包含功能键行。 */
 export const KEYBOARD_ROWS: KeyDef[][] = [
   [
-    { code: "`", label: "~" },
-    { code: "1", label: "1" },
-    { code: "2", label: "2" },
-    { code: "3", label: "3" },
-    { code: "4", label: "4" },
-    { code: "5", label: "5" },
-    { code: "6", label: "6" },
-    { code: "7", label: "7" },
-    { code: "8", label: "8" },
-    { code: "9", label: "9" },
-    { code: "0", label: "0" },
-    { code: "-", label: "-" },
-    { code: "=", label: "=" },
-    { code: "backspace", label: "⌫", w: 2, hot: true },
+    { code: "escape", label: "Esc" }, gap(),
+    { code: "f1", label: "F1" }, { code: "f2", label: "F2" }, { code: "f3", label: "F3" }, { code: "f4", label: "F4" }, gap(),
+    { code: "f5", label: "F5" }, { code: "f6", label: "F6" }, { code: "f7", label: "F7" }, { code: "f8", label: "F8" }, gap(),
+    { code: "f9", label: "F9" }, { code: "f10", label: "F10" }, { code: "f11", label: "F11" }, { code: "f12", label: "F12" },
+  ],
+  [gap(1)],
+  [
+    { code: "`", label: "`" },
+    { code: "1", label: "1" }, { code: "2", label: "2" }, { code: "3", label: "3" },
+    { code: "4", label: "4" }, { code: "5", label: "5" }, { code: "6", label: "6" },
+    { code: "7", label: "7" }, { code: "8", label: "8" }, { code: "9", label: "9" },
+    { code: "0", label: "0" }, { code: "-", label: "-" }, { code: "=", label: "=" },
+    { code: "backspace", label: "Backspace", w: 2 },
   ],
   [
-    { code: "tab", label: "Tab", w: 1.5, hot: true },
-    { code: "q", label: "Q" },
-    { code: "w", label: "W" },
-    { code: "e", label: "E" },
-    { code: "r", label: "R" },
-    { code: "t", label: "T" },
-    { code: "y", label: "Y" },
-    { code: "u", label: "U" },
-    { code: "i", label: "I" },
-    { code: "o", label: "O" },
-    { code: "p", label: "P" },
-    { code: "[", label: "[" },
-    { code: "]", label: "]" },
+    { code: "tab", label: "Tab", w: 1.5 },
+    { code: "q", label: "Q" }, { code: "w", label: "W" }, { code: "e", label: "E" },
+    { code: "r", label: "R" }, { code: "t", label: "T" }, { code: "y", label: "Y" },
+    { code: "u", label: "U" }, { code: "i", label: "I" }, { code: "o", label: "O" },
+    { code: "p", label: "P" }, { code: "[", label: "[" }, { code: "]", label: "]" },
     { code: "\\", label: "\\", w: 1.5 },
   ],
   [
-    { code: "capslock", label: "Caps", w: 1.75, hot: true },
-    { code: "a", label: "A" },
-    { code: "s", label: "S" },
-    { code: "d", label: "D" },
-    { code: "f", label: "F" },
-    { code: "g", label: "G" },
-    { code: "h", label: "H" },
-    { code: "j", label: "J" },
-    { code: "k", label: "K" },
-    { code: "l", label: "L" },
-    { code: ";", label: ";" },
-    { code: "'", label: "'" },
-    { code: "enter", label: "⏎", w: 2.25, accent: true },
+    { code: "capslock", label: "Caps Lock", w: 1.75 },
+    { code: "a", label: "A" }, { code: "s", label: "S" }, { code: "d", label: "D" },
+    { code: "f", label: "F" }, { code: "g", label: "G" }, { code: "h", label: "H" },
+    { code: "j", label: "J" }, { code: "k", label: "K" }, { code: "l", label: "L" },
+    { code: ";", label: ";" }, { code: "'", label: "'" },
+    { code: "enter", label: "Enter", w: 2.25 },
   ],
   [
-    { code: "shift", label: "Shift", w: 2.25, hot: true },
-    { code: "z", label: "Z" },
-    { code: "x", label: "X" },
-    { code: "c", label: "C" },
-    { code: "v", label: "V" },
-    { code: "b", label: "B" },
-    { code: "n", label: "N" },
-    { code: "m", label: "M" },
-    { code: ",", label: "," },
-    { code: ".", label: "." },
-    { code: "/", label: "/" },
-    { code: "shift", label: "Shift", w: 2.25, hot: true },
+    { code: "shift", label: "Shift", w: 2.25 },
+    { code: "z", label: "Z" }, { code: "x", label: "X" }, { code: "c", label: "C" },
+    { code: "v", label: "V" }, { code: "b", label: "B" }, { code: "n", label: "N" },
+    { code: "m", label: "M" }, { code: ",", label: "," }, { code: ".", label: "." },
+    { code: "/", label: "/" }, { code: "shift", label: "Shift", w: 2.75 },
   ],
   [
-    { code: "ctrl", label: "Ctrl", w: 1.25, hot: true },
-    { code: "win", label: "⊞", w: 1.25, hot: true },
-    { code: "alt", label: "Alt", w: 1.25, hot: true },
-    { code: "space", label: "", w: 6.25 },
-    { code: "alt", label: "Alt", w: 1.25, hot: true },
-    { code: "ctrl", label: "Ctrl", w: 1.25, hot: true },
+    { code: "ctrl", label: "Ctrl", w: 1.25 }, { code: "win", label: "Win", w: 1.25 },
+    { code: "alt", label: "Alt", w: 1.25 }, { code: "space", label: "", w: 6.25 },
+    { code: "alt", label: "Alt", w: 1.25 }, { code: "menu", label: "Menu", w: 1.25 },
+    { code: "ctrl", label: "Ctrl", w: 1.25 },
   ],
 ];
 
-export const COMPACT_LAYOUT: KeyDef[][] = KEYBOARD_ROWS;
-
-// 带小键盘布局：主键盘区 + 导航/方向键 + 数字小键盘
-const NUMPAD_BLOCK: KeyDef[][] = [
+/** 标准编辑/方向键区，与主键区的功能行和字母区对齐。 */
+export const NAVIGATION_ROWS: KeyDef[][] = [
   [
-    { code: "insert", label: "Ins" },
+    { code: "printscreen", label: "PrtSc" },
+    { code: "scrolllock", label: "Scroll" },
+    { code: "pause", label: "Pause" },
+  ],
+  [gap(1)],
+  [
+    { code: "insert", label: "Insert" },
     { code: "home", label: "Home" },
     { code: "pageup", label: "PgUp" },
   ],
   [
-    { code: "delete", label: "Del" },
+    { code: "delete", label: "Delete" },
     { code: "end", label: "End" },
     { code: "pagedown", label: "PgDn" },
   ],
-  [{ code: "arrowup", label: "↑" }],
+  [gap(1)],
+  [gap(1), { code: "arrowup", label: "↑" }, gap(1)],
   [
     { code: "arrowleft", label: "←" },
     { code: "arrowdown", label: "↓" },
     { code: "arrowright", label: "→" },
   ],
-  [
-    { code: "numlock", label: "Num" },
-    { code: "numpaddiv", label: "/" },
-    { code: "numpadmul", label: "*" },
-    { code: "numpadsub", label: "-" },
-  ],
-  [
-    { code: "numpad7", label: "7" },
-    { code: "numpad8", label: "8" },
-    { code: "numpad9", label: "9" },
-    { code: "numpadadd", label: "+" },
-  ],
-  [
-    { code: "numpad4", label: "4" },
-    { code: "numpad5", label: "5" },
-    { code: "numpad6", label: "6" },
-  ],
-  [
-    { code: "numpad1", label: "1" },
-    { code: "numpad2", label: "2" },
-    { code: "numpad3", label: "3" },
-    { code: "numpadenter", label: "⏎" },
-  ],
-  [
-    { code: "numpad0", label: "0", w: 2 },
-    { code: "numpaddot", label: "." },
-  ],
 ];
 
-export const FULL_LAYOUT_BLOCKS: KeyDef[][][] = [KEYBOARD_ROWS, NUMPAD_BLOCK];
+/** 标准 17 键数字区；+ 与 Enter 为纵向双倍键，0 为横向双倍键。 */
+export const NUMPAD_GRID: KeyDef[][] = [[
+  { code: "numlock", label: "Num", x: 1, y: 1 },
+  { code: "numpaddiv", label: "/", x: 2, y: 1 },
+  { code: "numpadmul", label: "*", x: 3, y: 1 },
+  { code: "numpadsub", label: "−", x: 4, y: 1 },
+  { code: "numpad7", label: "7", x: 1, y: 2 },
+  { code: "numpad8", label: "8", x: 2, y: 2 },
+  { code: "numpad9", label: "9", x: 3, y: 2 },
+  { code: "numpadadd", label: "+", x: 4, y: 2, h: 2 },
+  { code: "numpad4", label: "4", x: 1, y: 3 },
+  { code: "numpad5", label: "5", x: 2, y: 3 },
+  { code: "numpad6", label: "6", x: 3, y: 3 },
+  { code: "numpad1", label: "1", x: 1, y: 4 },
+  { code: "numpad2", label: "2", x: 2, y: 4 },
+  { code: "numpad3", label: "3", x: 3, y: 4 },
+  { code: "numpadenter", label: "Enter", x: 4, y: 4, h: 2 },
+  { code: "numpad0", label: "0", x: 1, y: 5, w: 2 },
+  { code: "numpaddot", label: ".", x: 3, y: 5 },
+]];
+
+export const TKL_LAYOUT_BLOCKS: KeyDef[][][] = [KEYBOARD_ROWS, NAVIGATION_ROWS];
+export const FULL_LAYOUT_BLOCKS: KeyDef[][][] = [KEYBOARD_ROWS, NAVIGATION_ROWS, NUMPAD_GRID];

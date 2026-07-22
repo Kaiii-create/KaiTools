@@ -29,16 +29,23 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import { NButton, NInput, NSelect, NTag, useMessage } from "naive-ui";
 import ToolPage from "@/components/tool/ToolPage.vue";
 import ToolToolbar from "@/components/tool/ToolToolbar.vue";
+import { parseHistoryInput, useToolHistory } from "@/composables/useToolHistory";
 
 const message = useMessage();
 
 const DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz";
 const fromBase = ref(10);
 const value = ref("");
+const history = useToolHistory("base-convert", "进制转换", (item) => {
+  const saved = parseHistoryInput<{ base: number; value: string }>(item.input);
+  if (!saved) return;
+  fromBase.value = saved.base;
+  value.value = saved.value;
+});
 
 const baseOptions = [
   { label: "二进制 (2)", value: 2 },
@@ -51,8 +58,11 @@ function parseBig(str: string, base: number): bigint | null {
   const s = str.trim().toLowerCase().replace(/[\s_]/g, "");
   if (!s) return null;
   let n = 0n;
-  let negative = false;
-  const body = s.startsWith("-") ? ((negative = true), s.slice(1)) : s;
+  const negative = s.startsWith("-");
+  let body = s.startsWith("-") || s.startsWith("+") ? s.slice(1) : s;
+  const prefix = base === 2 ? "0b" : base === 8 ? "0o" : base === 16 ? "0x" : "";
+  if (prefix && body.startsWith(prefix)) body = body.slice(2);
+  if (!body) return null;
   for (const ch of body) {
     const d = DIGITS.indexOf(ch);
     if (d < 0 || d >= base) return null;
@@ -91,6 +101,15 @@ const bases = computed(() => {
 });
 
 const decValue = computed(() => (big.value === null ? "" : toBase(big.value, 10)));
+
+watch([value, fromBase], () => {
+  if (!value.value.trim() || big.value === null) return;
+  history.recordDebounced({
+    title: `${fromBase.value} 进制 · ${value.value.slice(0, 36)}`,
+    input: JSON.stringify({ base: fromBase.value, value: value.value }),
+    output: bases.value.map((item) => `${item.label}: ${item.out}`).join("\n"),
+  });
+});
 
 async function copy(text: string) {
   if (!text) return;

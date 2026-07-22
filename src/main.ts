@@ -11,7 +11,9 @@ if (hash.startsWith("#/kbd-widget")) {
   // 桌面小插件窗口：极简根，透明背景
   import("./tools/keyboard-stats/WidgetRoot.vue").then(({ default: WidgetRoot }) => {
     const app = createApp(WidgetRoot);
-    app.use(createPinia());
+    const pinia = createPinia();
+    app.use(pinia);
+    useThemeStore(pinia).init();
     document.documentElement.classList.add("kbd-widget-mode");
     app.mount("#app");
   });

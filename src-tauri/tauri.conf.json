@@ -2,7 +2,7 @@
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "KTool",
   "version": "0.1.0",
-  "identifier": "com.ktool.app",
+  "identifier": "com.kai.ktool",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
@@ -48,6 +48,7 @@
       },
       "nsis": {
         "installerIcon": "icons/icon.ico",
+        "installerHooks": "installer-hooks.nsh",
         "displayLanguageSelector": false,
         "languages": ["SimpChinese", "English"]
       }

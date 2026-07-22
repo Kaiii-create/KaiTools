@@ -51,6 +51,7 @@
           ref="previewRef"
           class="flex-1 min-w-0 overflow-auto p-4 markdown-body"
           @scroll="syncScroll('preview', $event)"
+          @click="onPreviewClick"
           v-html="html"
         />
       </div>
@@ -64,6 +65,8 @@ import { NButton, NButtonGroup, NRadioGroup, NRadioButton, useMessage } from "na
 import ToolPage from "@/components/tool/ToolPage.vue";
 import ToolToolbar from "@/components/tool/ToolToolbar.vue";
 import { marked } from "marked";
+import DOMPurify from "dompurify";
+import { useToolHistory } from "@/composables/useToolHistory";
 
 const message = useMessage();
 const text = ref(`# Markdown 编辑器
@@ -101,6 +104,9 @@ function hello() {
 const view = ref<"split" | "edit" | "preview">("split");
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
 const previewRef = ref<HTMLDivElement | null>(null);
+const history = useToolHistory("markdown-editor", "Markdown 编辑器", (item) => {
+  text.value = item.input;
+});
 
 marked.setOptions({
   gfm: true,
@@ -109,13 +115,22 @@ marked.setOptions({
 
 const html = computed(() => {
   try {
-    return marked.parse(text.value) as string;
+    return DOMPurify.sanitize(marked.parse(text.value) as string, {
+      USE_PROFILES: { html: true },
+    });
   } catch {
     return "<p>解析错误</p>";
   }
 });
 
-watch(text, () => {}, { immediate: true });
+watch(text, () => {
+  if (!text.value.trim()) return;
+  history.recordDebounced({
+    title: text.value.match(/^#{1,6}\s+(.+)$/m)?.[1]?.slice(0, 48) || "Markdown 文档",
+    input: text.value,
+    output: html.value,
+  }, 1500);
+});
 
 function insertAtCursor(before: string, after: string = "") {
   const ta = textareaRef.value;
@@ -144,6 +159,28 @@ function syncScroll(source: "edit" | "preview", e: Event) {
   const src = e.target as HTMLElement;
   const ratio = src.scrollTop / (src.scrollHeight - src.clientHeight || 1);
   target.scrollTop = ratio * (target.scrollHeight - target.clientHeight || 1);
+}
+
+async function onPreviewClick(e: MouseEvent) {
+  const target = e.target as HTMLElement;
+  const link = target.closest("a");
+  if (!link) return;
+  e.preventDefault();
+  const href = link.getAttribute("href") || "";
+  if (!/^https?:\/\//i.test(href)) {
+    message.warning("仅支持打开 http/https 链接");
+    return;
+  }
+  try {
+    if ("__TAURI_INTERNALS__" in window) {
+      const { open } = await import("@tauri-apps/plugin-shell");
+      await open(href);
+    } else {
+      window.open(href, "_blank", "noopener,noreferrer");
+    }
+  } catch {
+    message.error("链接打开失败");
+  }
 }
 
 async function onCopyHtml() {

@@ -1,71 +1,69 @@
 <template>
   <ToolPage class="json-page">
     <!-- 顶部工具栏 -->
-    <ToolToolbar :bordered="false" class="json-toolbar">
-      <n-switch v-model:value="escapeOn" size="small">
-        <template #checked>转义</template>
-        <template #unchecked>转义</template>
-      </n-switch>
-      <n-switch v-model:value="showLineNumbers" size="small">
-        <template #checked>行号</template>
-        <template #unchecked>行号</template>
-      </n-switch>
-      <n-switch v-model:value="compact" size="small">
-        <template #checked>压缩</template>
-        <template #unchecked>压缩</template>
-      </n-switch>
-      <n-switch v-model:value="autoFormat" size="small">
-        <template #checked>自动</template>
-        <template #unchecked>自动</template>
-      </n-switch>
+    <ToolToolbar :bordered="false" variant="subtle" class="json-toolbar">
+      <span class="switch-item">
+        <n-switch v-model:value="escapeOn" size="small" />
+        <span class="switch-label">保留转义</span>
+      </span>
+      <span class="switch-item">
+        <n-switch v-model:value="showLineNumbers" size="small" />
+        <span class="switch-label">行号</span>
+      </span>
+      <span class="switch-item">
+        <n-switch v-model:value="compact" size="small" />
+        <span class="switch-label">压缩</span>
+      </span>
+      <span class="switch-item">
+        <n-switch v-model:value="autoFormat" size="small" />
+        <span class="switch-label">自动</span>
+      </span>
 
       <template #side>
         <n-select v-model:value="indent" :options="indentOptions" size="small" class="indent-select" />
-        <n-button size="small" @click="onValidate">校验</n-button>
+        <n-button size="small" secondary @click="onValidate">校验</n-button>
         <n-button size="small" type="primary" @click="onFormat">格式化</n-button>
-        <n-button size="small" :disabled="!output" @click="onCopyOutput">复制</n-button>
-        <n-button size="small" @click="clearAll">清空</n-button>
       </template>
     </ToolToolbar>
 
     <!-- 左右分栏（可拖拽） -->
-    <div ref="containerRef" class="json-split" :class="{ 'is-dragging': dragging }">
-      <section class="json-pane" :style="{ width: `calc(${splitPct}% - 5px)` }">
-        <header class="json-pane-head">
-          <span>输入</span>
-          <div class="flex items-center gap-2">
-            <n-button text size="tiny" @click="pasteInput">粘贴</n-button>
-            <n-button text size="tiny" @click="input = ''">清空</n-button>
-          </div>
-        </header>
+    <SplitWorkspace
+      v-model="splitPct"
+      class="json-workspace"
+      input-label="输入"
+      input-variant="surface"
+      :output-label="compact ? '压缩结果' : '格式化结果'"
+    >
+      <template #input-actions>
+        <n-button text size="tiny" @click="loadExample">示例 JSON</n-button>
+        <n-button text size="tiny" @click="pasteInput">粘贴</n-button>
+        <n-button text size="tiny" @click="input = ''">清空</n-button>
+      </template>
+      <template #input>
         <EditorPane
           v-model="input"
           mono
+          variant="surface"
           :line-numbers="showLineNumbers"
           placeholder='在此粘贴 JSON，例如 {"name":"KTool","version":1}'
         />
-      </section>
-
-      <div class="json-divider" @mousedown.prevent="startDrag">
-        <span class="json-divider-grip" />
-      </div>
-
-      <section class="json-pane" :style="{ width: `calc(${100 - splitPct}% - 5px)` }">
-        <header class="json-pane-head">
-          <span>输出{{ compact ? '（压缩）' : '' }}</span>
-          <div class="flex items-center gap-2">
-            <n-button text size="tiny" :disabled="!output" @click="onSwap">交换</n-button>
-          </div>
-        </header>
+      </template>
+      <template #output-actions>
+        <n-button text size="tiny" :disabled="!output" @click="onSwap">交换</n-button>
+        <n-button text size="tiny" :disabled="!output" @click="onCopyOutput">复制</n-button>
+        <n-button text size="tiny" @click="clearAll">全部清空</n-button>
+      </template>
+      <template #output>
         <EditorPane
           v-model="output"
           readonly
           mono
+          variant="surface"
           :line-numbers="showLineNumbers"
           placeholder="格式化结果将显示在这里…"
         />
-      </section>
-    </div>
+      </template>
+    </SplitWorkspace>
 
     <StatusBar class="json-status" :tone="statusTone">
       {{ status }}
@@ -79,12 +77,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from "vue";
+import { ref, computed, watch, onMounted } from "vue";
 import { NButton, NSelect, NSwitch, useMessage } from "naive-ui";
 import ToolPage from "@/components/tool/ToolPage.vue";
 import ToolToolbar from "@/components/tool/ToolToolbar.vue";
 import StatusBar from "@/components/tool/StatusBar.vue";
 import EditorPane from "@/components/tool/EditorPane.vue";
+import SplitWorkspace from "@/components/tool/SplitWorkspace.vue";
 import { formatJson, minifyJson } from "@/api/json";
 import { useHistoryStore } from "@/stores/history";
 
@@ -105,12 +104,10 @@ const status = ref("");
 const statusType = ref<"default" | "success" | "error">("default");
 const autoFormat = ref(true);
 const escapeOn = ref(true); // 转义默认开启
-const showLineNumbers = ref(true);
+const showLineNumbers = ref(false);
 const compact = ref(false); // 压缩
 
-const splitPct = ref(50); // 默认 5:5
-const containerRef = ref<HTMLElement | null>(null);
-const dragging = ref(false);
+const splitPct = ref(44);
 
 const outputLineCount = computed(() => (output.value ? output.value.split("\n").length : 0));
 const statusTone = computed(() => statusType.value);
@@ -119,11 +116,78 @@ let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 let lastHistoryTime = 0;
 let lastHistoryInput = "";
 
-// 把输出中的 Unicode 转义还原为可读字符（如 \u003e -> >），用于右侧“显示正常”
-function decodeEscapes(s: string): string {
-  return s.replace(/\\u([0-9a-fA-F]{4})/g, (_, h) =>
-    String.fromCodePoint(parseInt(h, 16))
-  );
+const SAMPLE_JSON = String.raw`{
+  "project": {
+    "name": "KTool",
+    "description": "一款轻量、实用的开发者工具箱",
+    "features": ["JSON 格式化", "压缩", "校验", "转义处理"]
+  },
+  "author": {
+    "name": "kai",
+    "officialAccount": "PHPer技术",
+    "qq": "877166291",
+    "github": "https://github.com/Kaiii-create/KaiTools"
+  },
+  "escapeExamples": {
+    "newline": "第一行\n第二行",
+    "tab": "名称\tKTool",
+    "quote": "他说：\"Hello KTool\"",
+    "backslash": "C:\\Users\\kai\\KTool",
+    "unicode": "\u4f60\u597d\uff0cKTool",
+    "htmlSymbols": "<div data-name=\"KTool\">& © ™</div>",
+    "emoji": "🚀 ✨ 🧰"
+  },
+  "links": {
+    "search": "https://example.com/?keyword=KTool&from=json",
+    "email": "kai@example.com"
+  },
+  "enabled": true,
+  "version": 1
+}`;
+
+// 只还原能够安全直接出现在 JSON 字符串中的 Unicode 转义。
+// 控制字符、孤立代理项继续保留转义，避免把合法 JSON 变成非法文本。
+function decodeEscapesSafely(s: string): string {
+  let output = "";
+  let inString = false;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (ch === '"') {
+      inString = !inString;
+      output += ch;
+      continue;
+    }
+    if (!inString || ch !== "\\") {
+      output += ch;
+      continue;
+    }
+    const next = s[i + 1];
+    if (next !== "u") {
+      output += ch + (next ?? "");
+      i++;
+      continue;
+    }
+    const firstHex = s.slice(i + 2, i + 6);
+    if (!/^[0-9a-f]{4}$/i.test(firstHex)) {
+      output += ch;
+      continue;
+    }
+    const first = parseInt(firstHex, 16);
+    const secondEscape = s.slice(i + 6, i + 12);
+    if (first >= 0xd800 && first <= 0xdbff && /^\\u[dD][c-fC-F][0-9a-fA-F]{2}$/.test(secondEscape)) {
+      const second = parseInt(secondEscape.slice(2), 16);
+      output += String.fromCodePoint(0x10000 + ((first - 0xd800) << 10) + (second - 0xdc00));
+      i += 11;
+      continue;
+    }
+    if (first < 0x20 || first === 0x22 || first === 0x5c || (first >= 0xd800 && first <= 0xdfff)) {
+      output += s.slice(i, i + 6);
+    } else {
+      output += String.fromCodePoint(first);
+    }
+    i += 5;
+  }
+  return output;
 }
 
 watch(
@@ -136,7 +200,7 @@ watch(
   { flush: "post" }
 );
 
-async function runFormat(silent = false) {
+async function runFormat(_silent = false) {
   if (!input.value.trim()) {
     output.value = "";
     errorMsg.value = "";
@@ -150,10 +214,8 @@ async function runFormat(silent = false) {
     ? await minifyJson(text)
     : await formatJson(text, indent.value);
   if (res.success) {
-    // “转义”开启：把 \uXXXX 等还原为可读字符（显示正常）；
-    // 关闭：保持后端原始序列化结果，仅还原输入中原本就转义的序列，
-    // 不再对未转义的字符（如中文）额外编码。
-    output.value = escapeOn.value ? decodeEscapes(res.data) : res.data;
+    // 开启时保留输入中的转义形式；关闭时只安全还原可显示 Unicode。
+    output.value = escapeOn.value ? res.data : decodeEscapesSafely(res.data);
     errorMsg.value = "";
     status.value = compact.value ? "已压缩" : "格式化成功";
     statusType.value = "success";
@@ -170,8 +232,8 @@ async function runFormat(silent = false) {
       lastHistoryInput = input.value;
     }
   } else {
-    errorMsg.value = silent ? "" : res.error;
-    status.value = "JSON 语法错误";
+    errorMsg.value = res.error;
+    status.value = res.error;
     statusType.value = "error";
   }
 }
@@ -210,6 +272,12 @@ async function pasteInput() {
     message.error("粘贴失败（请检查剪贴板权限）");
   }
 }
+async function loadExample() {
+  input.value = SAMPLE_JSON;
+  output.value = "";
+  await runFormat(false);
+  message.success("示例 JSON 已载入");
+}
 function clearAll() {
   input.value = "";
   output.value = "";
@@ -237,32 +305,6 @@ watch(
   }
 );
 
-// —— 拖拽分栏 ——
-function startDrag() {
-  dragging.value = true;
-  document.addEventListener("mousemove", onDrag);
-  document.addEventListener("mouseup", stopDrag);
-  document.body.style.userSelect = "none";
-  document.body.style.cursor = "col-resize";
-}
-function onDrag(e: MouseEvent) {
-  if (!dragging.value || !containerRef.value) return;
-  const rect = containerRef.value.getBoundingClientRect();
-  let pct = ((e.clientX - rect.left) / rect.width) * 100;
-  pct = Math.min(90, Math.max(10, pct));
-  splitPct.value = pct;
-}
-function stopDrag() {
-  dragging.value = false;
-  document.removeEventListener("mousemove", onDrag);
-  document.removeEventListener("mouseup", stopDrag);
-  document.body.style.userSelect = "";
-  document.body.style.cursor = "";
-}
-onUnmounted(() => {
-  document.removeEventListener("mousemove", onDrag);
-  document.removeEventListener("mouseup", stopDrag);
-});
 </script>
 
 <style scoped>
@@ -277,9 +319,8 @@ onUnmounted(() => {
   padding: 12px 16px;
 }
 .json-toolbar {
-  min-height: 46px;
-  padding: 7px 8px;
-  border-bottom: 1px solid var(--ktool-border);
+  min-height: 48px;
+  padding: 8px 12px;
   flex: 0 0 auto;
 }
 .json-toolbar :deep(.n-switch) {
@@ -288,77 +329,25 @@ onUnmounted(() => {
 .indent-select {
   width: 124px;
 }
-
-.json-split {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  width: 100%;
-  margin-top: 12px;
+.json-toolbar .switch-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.json-toolbar .switch-label {
+  font-size: 13px;
+  line-height: 1;
+  color: var(--ktool-text-soft);
+  white-space: nowrap;
   user-select: none;
 }
-.json-split.is-dragging {
-  cursor: col-resize;
-}
-.json-pane {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  height: 100%;
-  background: var(--ktool-surface);
-  border: 1px solid var(--ktool-border);
-  border-radius: var(--ktool-radius);
-  box-shadow: var(--ktool-shadow-sm);
-  overflow: hidden;
-}
-.json-pane-head {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 7px 12px;
-  border-bottom: 1px solid var(--ktool-border);
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--ktool-text-soft);
-}
-.json-pane :deep(.editor-pane) {
+.json-workspace {
   flex: 1 1 auto;
   min-height: 0;
-}
-.json-divider {
-  flex: 0 0 10px;
-  cursor: col-resize;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-}
-.json-divider::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  width: 1px;
-  transform: translateX(-50%);
-  background: var(--ktool-border);
-}
-.json-divider-grip {
-  width: 4px;
-  height: 38px;
-  border-radius: 4px;
-  background: var(--ktool-border-strong);
-  transition: background 0.15s ease;
-}
-.json-divider:hover .json-divider-grip,
-.json-split.is-dragging .json-divider-grip {
-  background: var(--ktool-brand);
+  margin-top: 12px;
 }
 .json-status {
-  margin-top: 10px;
+  margin-top: 12px;
   flex: 0 0 auto;
-  border: 1px solid var(--ktool-border);
-  border-radius: var(--ktool-radius-sm);
 }
 </style>

@@ -4,13 +4,13 @@
     <div class="preview-section flex items-center gap-4 px-4 py-3 bg-gray-50 dark:bg-gray-800">
       <div
         class="color-preview w-16 h-16 rounded-lg border-2 border-gray-300 dark:border-gray-600 shadow-lg cursor-pointer relative overflow-hidden"
-        :style="{ backgroundColor: hex }"
+        :style="{ backgroundColor: normalizedHex || '#000000' }"
         @click="triggerNativePicker"
       >
         <input
           ref="nativePickerRef"
           type="color"
-          :value="hex"
+          :value="normalizedHex || '#000000'"
           @input="onNativeColorInput"
           class="absolute inset-0 opacity-0 cursor-pointer"
           style="width: 100%; height: 100%"
@@ -40,9 +40,10 @@
         <!-- HEX -->
         <n-card title="HEX" size="small">
           <div class="row">
-            <n-input v-model:value="hex" placeholder="#000000" @input="syncFromHex" class="flex-1" />
-            <n-button size="small" quaternary @click="onCopy(hex, 'HEX')">复制</n-button>
+            <n-input v-model:value="hex" placeholder="#000000" @input="syncFromHex" @blur="commitHex" class="flex-1" />
+            <n-button size="small" quaternary :disabled="!!hexError" @click="onCopy(normalizedHex || '', 'HEX')">复制</n-button>
           </div>
+          <div v-if="hexError" class="text-xs text-[var(--ktool-danger)] mt-2">{{ hexError }}</div>
         </n-card>
 
         <!-- RGB -->
@@ -104,6 +105,7 @@ import { NCard, NSpace, NInput, NInputNumber, NButton, NIcon, useMessage } from 
 import { ColorPaletteOutline as ColorPickerIcon, ScanOutline as ScreenIcon } from "@vicons/ionicons5";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { openColorPicker } from "@/lib/picker";
+import { useToolHistory } from "@/composables/useToolHistory";
 
 const message = useMessage();
 
@@ -129,20 +131,37 @@ const l = ref(60);
 const nativePickerRef = ref<HTMLInputElement | null>(null);
 
 const history = ref<string[]>(["#3b82f6", "#8b5cf6", "#10b981", "#f59e0b", "#ef4444"]);
+const toolHistory = useToolHistory("color", "颜色工具", (item) => {
+  hex.value = item.input;
+  syncFromHex();
+});
 
 const rgbString = computed(() => `rgb(${r.value}, ${g.value}, ${b.value})`);
 const rgbaString = computed(() => `rgba(${r.value}, ${g.value}, ${b.value}, ${a.value})`);
 const hslString = computed(() => `hsl(${h.value}, ${s.value}%, ${l.value}%)`);
+const normalizedHex = computed(() => normalizeHex(hex.value));
+const hexError = computed(() => hex.value.trim() && !normalizedHex.value ? "请输入 #RGB 或 #RRGGBB" : "");
 
 function triggerNativePicker() {
   nativePickerRef.value?.click();
 }
 
-function hexToRgb(hex: string): { r: number; g: number; b: number } {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  return result
-    ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) }
-    : { r: 0, g: 0, b: 0 };
+function normalizeHex(value: string): string | null {
+  const raw = value.trim().replace(/^#/, "");
+  if (/^[0-9a-f]{3}$/i.test(raw)) {
+    return `#${raw.split("").map((ch) => ch + ch).join("")}`.toLowerCase();
+  }
+  return /^[0-9a-f]{6}$/i.test(raw) ? `#${raw.toLowerCase()}` : null;
+}
+
+function hexToRgb(value: string): { r: number; g: number; b: number } | null {
+  const normalized = normalizeHex(value);
+  if (!normalized) return null;
+  return {
+    r: parseInt(normalized.slice(1, 3), 16),
+    g: parseInt(normalized.slice(3, 5), 16),
+    b: parseInt(normalized.slice(5, 7), 16),
+  };
 }
 
 function rgbToHex(r: number, g: number, b: number): string {
@@ -195,9 +214,14 @@ function onNativeColorInput(e: Event) {
 
 function syncFromHex() {
   const rgb = hexToRgb(hex.value);
+  if (!rgb) return;
   r.value = rgb.r; g.value = rgb.g; b.value = rgb.b;
   const hsl = rgbToHsl(r.value, g.value, b.value);
   h.value = hsl.h; s.value = hsl.s; l.value = hsl.l;
+}
+
+function commitHex() {
+  if (normalizedHex.value) hex.value = normalizedHex.value;
 }
 
 function syncFromRgb() {
@@ -213,9 +237,17 @@ function syncFromHsl() {
 }
 
 watch(hex, () => {
-  if (!history.value.includes(hex.value)) {
-    history.value.unshift(hex.value);
+  const color = normalizeHex(hex.value);
+  if (color && !history.value.includes(color)) {
+    history.value.unshift(color);
     if (history.value.length > 20) history.value.pop();
+  }
+  if (color) {
+    toolHistory.recordDebounced({
+      title: `颜色 ${color.toUpperCase()}`,
+      input: color,
+      output: `${rgbString.value}\n${rgbaString.value}\n${hslString.value}`,
+    });
   }
 });
 

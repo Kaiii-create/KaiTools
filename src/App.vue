@@ -32,7 +32,9 @@ import { getThemeOverrides } from "@/lib/theme";
 const themeStore = useThemeStore();
 
 const naiveTheme = computed(() => (themeStore.isDark ? darkTheme : lightTheme));
-const themeOverrides = computed(() => getThemeOverrides(themeStore.isDark));
+const themeOverrides = computed(() =>
+  getThemeOverrides(themeStore.isDark, themeStore.accentColor)
+);
 
 // 注入设置信息供设置弹窗读取
 async function getAppInfo() {
@@ -53,6 +55,7 @@ async function getAppInfo() {
       os: "Windows",
     };
   }
+  window.dispatchEvent(new Event("ktool-app-info"));
 }
 
 onMounted(async () => {

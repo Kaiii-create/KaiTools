@@ -1,5 +1,5 @@
 <template>
-  <div class="editor-pane flex flex-col h-full min-h-0">
+  <div class="editor-pane flex flex-col h-full min-h-0" :class="`editor-pane--${variant}`">
     <header
       v-if="label || $slots.actions"
       class="editor-pane-head flex items-center justify-between gap-2 px-1 pb-1.5"
@@ -22,7 +22,7 @@
         :placeholder="placeholder"
         :autosize="autosize"
         class="editor-pane-input"
-        :class="{ 'editor-pane-input--mono': mono }"
+        :class="{ 'editor-pane-input--mono': mono, 'editor-pane-input--line-numbers': lineNumbers }"
       />
     </div>
   </div>
@@ -48,6 +48,12 @@ const props = withDefaults(
     autosize?: boolean | { minRows: number; maxRows: number };
     /** 是否显示代码行号 */
     lineNumbers?: boolean;
+    /**
+     * 视觉变体（仅影响外观，不改变任何布局或逻辑）：
+     * - surface：标准编辑表面，输入与输出的默认样式
+     * - inset：可选内陷底，仅用于需要弱化的辅助编辑区
+     */
+    variant?: "inset" | "surface";
   }>(),
   {
     modelValue: "",
@@ -55,6 +61,7 @@ const props = withDefaults(
     mono: false,
     autosize: false,
     lineNumbers: false,
+    variant: "surface",
   }
 );
 
@@ -86,26 +93,46 @@ onUnmounted(() => textarea?.removeEventListener("scroll", syncGutter));
 
 <style scoped>
 .editor-pane-label {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--ktool-text-soft);
   letter-spacing: 0.01em;
 }
 .editor-pane-body {
-  border-radius: var(--ktool-radius);
+  border: 1px solid var(--ktool-border-strong);
+  border-radius: var(--ktool-radius-md);
   overflow: hidden;
+  transition: border-color var(--ktool-duration) var(--ktool-ease),
+    box-shadow var(--ktool-duration) var(--ktool-ease);
+}
+.editor-pane-body:focus-within {
+  border-color: var(--ktool-brand);
+  box-shadow: 0 0 0 2px var(--ktool-brand-soft);
+}
+/* 视觉变体：仅控制背景，不改变布局或逻辑 */
+.editor-pane--inset .editor-pane-body,
+.editor-pane--inset .editor-pane-gutter,
+.editor-pane--inset .editor-pane-input :deep(.n-input-wrapper),
+.editor-pane--inset .editor-pane-input :deep(.n-input__textarea),
+.editor-pane--inset .editor-pane-input :deep(textarea) {
   background: var(--ktool-surface-inset);
+}
+.editor-pane--surface .editor-pane-body,
+.editor-pane--surface .editor-pane-gutter,
+.editor-pane--surface .editor-pane-input :deep(.n-input-wrapper),
+.editor-pane--surface .editor-pane-input :deep(.n-input__textarea),
+.editor-pane--surface .editor-pane-input :deep(textarea) {
+  background: var(--ktool-surface);
 }
 .editor-pane-gutter {
   width: 42px;
   flex: 0 0 42px;
-  padding: 10px 8px;
+  padding: 12px 8px;
   overflow: hidden;
   border-right: 1px solid var(--ktool-border);
-  background: var(--ktool-surface-inset);
   color: var(--ktool-text-mute);
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.6;
   text-align: right;
   user-select: none;
@@ -120,10 +147,13 @@ onUnmounted(() => textarea?.removeEventListener("scroll", syncGutter));
   height: 100%;
   border-radius: 0;
 }
+.editor-pane-input :deep(.n-input__border),
+.editor-pane-input :deep(.n-input__state-border) {
+  display: none;
+}
 .editor-pane-input :deep(.n-input-wrapper),
 .editor-pane-input :deep(.n-input__textarea),
 .editor-pane-input :deep(textarea) {
-  background: var(--ktool-surface-inset);
   height: 100%;
 }
 .editor-pane-input :deep(textarea) {
@@ -136,5 +166,10 @@ onUnmounted(() => textarea?.removeEventListener("scroll", syncGutter));
 .editor-pane-input--mono :deep(textarea) {
   font-family: "JetBrains Mono", "Fira Code", "SFMono-Regular", Consolas,
     "Liberation Mono", Menlo, monospace;
+}
+.editor-pane-input--line-numbers :deep(textarea) {
+  white-space: pre;
+  overflow-wrap: normal;
+  overflow-x: auto;
 }
 </style>

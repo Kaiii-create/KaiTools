@@ -1,0 +1,25 @@
+name: 功能建议
+description: 建议增加工具或改进现有功能
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: scenario
+    attributes:
+      label: 使用场景
+      description: 你遇到了什么问题，为什么需要这个功能？
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: 期望方案
+      description: 希望 KTool 如何操作、展示和输出结果？
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 其他方案或补充
+      description: 可以附上参考产品、截图或替代方案。
+

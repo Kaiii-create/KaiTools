@@ -17,9 +17,10 @@
       <TitleBar
         :tool="activeTool"
         :show-history="showHistory"
+        :show-keyboard-stats="showKeyboardStats"
+        @toggle-keyboard-stats="showKeyboardStats = !showKeyboardStats"
         @toggle-history="showHistory = !showHistory"
         @open-settings="showSettings = true"
-        @open-command="showCommand = true"
       />
 
       <div class="app-workspace flex-1 min-h-0">
@@ -38,6 +39,19 @@
       @select="onSelect"
       @clear="historyStore.clear()"
     />
+
+    <!-- 键盘统计：独立功能，不占用左侧工具导航 -->
+    <n-modal
+      :show="showKeyboardStats"
+      preset="card"
+      title="键盘统计"
+      :bordered="false"
+      class="keyboard-stats-modal"
+      style="width: min(1160px, calc(100vw - 40px))"
+      @update:show="showKeyboardStats = $event"
+    >
+      <KeyboardStats />
+    </n-modal>
 
     <!-- 命令面板 -->
     <CommandPalette
@@ -59,6 +73,8 @@ import TitleBar from "@/components/TitleBar.vue";
 import HistoryDrawer from "@/components/HistoryDrawer.vue";
 import CommandPalette from "@/components/CommandPalette.vue";
 import SettingsModal from "@/components/SettingsModal.vue";
+import KeyboardStats from "@/tools/keyboard-stats/KeyboardStats.vue";
+import { NModal } from "naive-ui";
 import { tools } from "@/tools/registry";
 import { useHistoryStore } from "@/stores/history";
 import type { HistoryItem } from "@/stores/history";
@@ -67,15 +83,18 @@ import { useSettingsStore } from "@/stores/settings";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { openColorPicker } from "@/lib/picker";
 import { invoke } from "@tauri-apps/api/core";
+import { useKeyboardHook } from "@/tools/keyboard-stats/useKeyboardHook";
 
 const historyStore = useHistoryStore();
 const navStore = useNavStore();
 const settings = useSettingsStore();
+const keyboardHook = useKeyboardHook();
 
 const activeToolId = ref<string>(tools[0].id);
 const showHistory = ref(false);
 const showCommand = ref(false);
 const showSettings = ref(false);
+const showKeyboardStats = ref(false);
 const maximized = ref(false);
 const sidebarRef = ref<InstanceType<typeof Sidebar> | null>(null);
 
@@ -112,6 +131,12 @@ onMounted(() => {
   getCurrentWindow()
     .listen("open-color-picker", () => openColorPicker())
     .catch(() => {});
+  keyboardHook.loadFromStorage();
+  if (keyboardHook.shouldAutoStart()) keyboardHook.start().catch(() => {});
+});
+
+onUnmounted(() => {
+  keyboardHook.shutdown().catch(() => {});
 });
 
 // 屏幕取色全局快捷键：随设置变化交给 Rust 端重注册
@@ -156,9 +181,18 @@ watch(() => settings.data.closeBehavior, (m) => applyCloseMode(m));
   background: var(--ktool-bg);
 }
 .app-main {
-  background: var(--ktool-bg);
+  background: var(--ktool-surface);
+  min-width: 0;
 }
 .app-workspace {
   background: var(--ktool-surface);
+  min-width: 0;
+}
+:global(.keyboard-stats-modal.n-card) {
+  height: min(780px, calc(100vh - 72px));
+}
+:global(.keyboard-stats-modal .n-card__content) {
+  min-height: 0;
+  padding: 0;
 }
 </style>

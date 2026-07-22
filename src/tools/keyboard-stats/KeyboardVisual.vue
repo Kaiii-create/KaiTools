@@ -2,41 +2,57 @@
   <div class="kbd-visual" :class="{ compact }" :style="{ '--kbd-accent': accent }">
     <div class="kbd-blocks">
       <div
-        v-for="(block, bi) in blocks"
-        :key="bi"
+        v-for="(block, blockIndex) in blocks"
+        :key="blockIndex"
         class="kbd-block"
-        :class="{ 'kbd-block--numpad': blocks.length > 1 && bi === blocks.length - 1 }"
+        :class="{
+          'kbd-block--main': blockIndex === 0,
+          'kbd-block--navigation': blockIndex === 1 && blocks.length > 1,
+          'kbd-block--numpad': isGridBlock(block),
+        }"
       >
-        <div v-for="(row, ri) in block" :key="ri" class="kbd-row">
+        <div v-if="isGridBlock(block)" class="kbd-numpad-grid">
           <div
-            v-for="(k, ki) in row"
-            :key="ri + '-' + ki + '-' + k.code"
+            v-for="key in block.flat()"
+            :key="`${key.code}-${key.x}-${key.y}`"
             class="kbd-key"
-            :class="{ 'is-active': activeMap[keyId(k)] }"
-            :style="keyStyle(k)"
-            :data-code="k.code"
+            :class="{ 'is-active': activeMap[key.code] }"
+            :style="gridKeyStyle(key)"
           >
-            <!-- 波纹 -->
-            <span
-              v-for="r in ripples[keyId(k)] || []"
-              :key="r.id"
-              class="kbd-ripple"
-            />
-            <!-- 键帽内容 -->
-            <span class="kbd-label">{{ k.label }}</span>
-            <span v-if="showCount && counts[k.code]" class="kbd-count">{{ formatCount(counts[k.code]) }}</span>
-            <!-- 浮起气泡 -->
+            <span v-for="ripple in ripples[key.code] || []" :key="ripple.id" class="kbd-ripple" />
+            <span class="kbd-label">{{ key.label }}</span>
+            <span v-if="showCount && counts[key.code]" class="kbd-count">{{ formatCount(counts[key.code]) }}</span>
             <transition-group name="kbd-pop" tag="span" class="kbd-pop-layer">
-              <span
-                v-for="p in pops[keyId(k)] || []"
-                :key="p.id"
-                class="kbd-pop-bubble"
-              >+1</span>
+              <span v-for="pop in pops[key.code] || []" :key="pop.id" class="kbd-pop-bubble">+1</span>
             </transition-group>
-            <!-- 光晕 -->
-            <span class="kbd-glow" />
           </div>
         </div>
+
+        <template v-else>
+          <div
+            v-for="(row, rowIndex) in block"
+            :key="rowIndex"
+            class="kbd-row"
+            :class="{ 'kbd-row--spacer': row.every((key) => key.spacer) }"
+          >
+            <div
+              v-for="(key, keyIndex) in row"
+              :key="`${rowIndex}-${keyIndex}-${key.code}`"
+              class="kbd-key"
+              :class="{ 'kbd-key--spacer': key.spacer, 'is-active': activeMap[key.code] }"
+              :style="rowKeyStyle(key)"
+            >
+              <template v-if="!key.spacer">
+                <span v-for="ripple in ripples[key.code] || []" :key="ripple.id" class="kbd-ripple" />
+                <span class="kbd-label">{{ key.label }}</span>
+                <span v-if="showCount && counts[key.code]" class="kbd-count">{{ formatCount(counts[key.code]) }}</span>
+                <transition-group name="kbd-pop" tag="span" class="kbd-pop-layer">
+                  <span v-for="pop in pops[key.code] || []" :key="pop.id" class="kbd-pop-bubble">+1</span>
+                </transition-group>
+              </template>
+            </div>
+          </div>
+        </template>
       </div>
     </div>
   </div>
@@ -48,21 +64,18 @@ import { KEYBOARD_ROWS, type KeyDef } from "./keyLayout";
 
 const props = withDefaults(
   defineProps<{
-    /** 键盘区块：每个区块是一组行（主键盘 / 小键盘等） */
     blocks?: KeyDef[][][];
     counts?: Record<string, number>;
     accent?: string;
     showCount?: boolean;
     compact?: boolean;
-    /** 当前按下的物理键 code（由全局键盘钩子驱动） */
     activeCode?: string | null;
-    /** 每次按键自增，用于触发特效 */
     activeSeq?: number;
   }>(),
   {
     blocks: () => [KEYBOARD_ROWS],
     counts: () => ({}),
-    accent: "#6366f1",
+    accent: "var(--ktool-brand)",
     showCount: true,
     compact: false,
     activeCode: null,
@@ -70,52 +83,51 @@ const props = withDefaults(
   }
 );
 
-function keyId(k: KeyDef): string {
-  return k.code;
-}
-
 const activeMap = reactive<Record<string, boolean>>({});
 const ripples = reactive<Record<string, { id: number }[]>>({});
 const pops = reactive<Record<string, { id: number }[]>>({});
-let seq = 0;
+let sequence = 0;
 
-function keyStyle(k: KeyDef): Record<string, string> {
-  const style: Record<string, string> = {};
-  style.flexGrow = String(k.w ?? 1);
-  return style;
+function isGridBlock(block: KeyDef[][]): boolean {
+  return block.flat().some((key) => key.x != null || key.y != null || key.h != null);
 }
 
-function formatCount(n: number): string {
-  if (n >= 1000) return (n / 1000).toFixed(1) + "k";
-  return String(n);
+function rowKeyStyle(key: KeyDef): Record<string, string> {
+  return { flexGrow: String(key.w ?? 1) };
 }
 
-// 外部调用：触发某个 code 的按下特效
+function gridKeyStyle(key: KeyDef): Record<string, string> {
+  return {
+    gridColumn: `${key.x ?? 1} / span ${key.w ?? 1}`,
+    gridRow: `${key.y ?? 1} / span ${key.h ?? 1}`,
+  };
+}
+
+function formatCount(count: number): string {
+  if (count >= 10000) return `${Math.round(count / 1000)}k`;
+  if (count >= 1000) return `${(count / 1000).toFixed(1)}k`;
+  return String(count);
+}
+
 function trigger(code: string) {
-  const id = code;
-  activeMap[id] = true;
-  window.setTimeout(() => {
-    activeMap[id] = false;
-  }, 160);
+  activeMap[code] = true;
+  window.setTimeout(() => { activeMap[code] = false; }, 130);
 
-  const rid = ++seq;
-  if (!ripples[id]) ripples[id] = [];
-  ripples[id].push({ id: rid });
+  const rippleId = ++sequence;
+  if (!ripples[code]) ripples[code] = [];
+  ripples[code].push({ id: rippleId });
   window.setTimeout(() => {
-    const arr = ripples[id];
-    if (arr) ripples[id] = arr.filter((r) => r.id !== rid);
-  }, 600);
+    if (ripples[code]) ripples[code] = ripples[code].filter((item) => item.id !== rippleId);
+  }, 420);
 
-  const pid = ++seq;
-  if (!pops[id]) pops[id] = [];
-  pops[id].push({ id: pid });
+  const popId = ++sequence;
+  if (!pops[code]) pops[code] = [];
+  pops[code].push({ id: popId });
   window.setTimeout(() => {
-    const arr = pops[id];
-    if (arr) pops[id] = arr.filter((p) => p.id !== pid);
-  }, 700);
+    if (pops[code]) pops[code] = pops[code].filter((item) => item.id !== popId);
+  }, 520);
 }
 
-// 由外部（全局键盘钩子）驱动：监听按下序号变化触发特效，避免依赖 ref 时序
 watch(
   () => props.activeSeq,
   () => {
@@ -128,161 +140,146 @@ defineExpose({ trigger });
 
 <style scoped>
 .kbd-visual {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
   width: 100%;
+  min-width: 860px;
   user-select: none;
 }
 .kbd-blocks {
   display: flex;
-  gap: 18px;
   align-items: flex-start;
+  gap: 12px;
   width: 100%;
 }
 .kbd-block {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  flex: 1 1 auto;
+  gap: 5px;
   min-width: 0;
 }
+.kbd-block--main {
+  flex: 1 1 auto;
+}
+.kbd-block--navigation {
+  flex: 0 0 164px;
+}
 .kbd-block--numpad {
-  flex: 0 0 auto;
-  width: 230px;
+  flex: 0 0 216px;
+  padding-top: 60px;
 }
 .kbd-row {
   display: flex;
-  gap: 6px;
+  gap: 5px;
   width: 100%;
+}
+.kbd-row--spacer {
+  height: 8px;
+}
+.kbd-row--spacer .kbd-key {
+  height: 8px;
+}
+.kbd-numpad-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: repeat(5, 42px);
+  gap: 5px;
+}
+.kbd-numpad-grid .kbd-key {
+  height: auto;
 }
 .kbd-key {
   position: relative;
-  flex: 0 0 auto;
-  flex-basis: 0;
+  flex: 0 0 0;
   min-width: 0;
-  aspect-ratio: auto;
-  height: 48px;
-  border-radius: 10px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.18));
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  height: 42px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgba(255, 255, 255, 0.82);
-  font-size: 12px;
+  overflow: hidden;
+  border: 1px solid var(--ktool-border-strong);
+  border-radius: 7px;
+  background: var(--ktool-surface-2);
+  box-shadow: 0 2px 0 var(--ktool-border-strong);
+  color: var(--ktool-text-soft);
+  font-size: 11px;
   font-weight: 600;
-  overflow: visible;
-  transition: transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.12s ease, background 0.2s ease, border-color 0.2s ease;
+  transition: transform 100ms var(--ktool-ease), border-color 100ms var(--ktool-ease),
+    background 100ms var(--ktool-ease), box-shadow 100ms var(--ktool-ease);
+}
+.kbd-key--spacer {
+  visibility: hidden;
+  pointer-events: none;
 }
 .kbd-key.is-active {
-  transform: translateY(3px) scale(0.97);
-  box-shadow: 0 0 0 rgba(0, 0, 0, 0.35), 0 0 22px 2px var(--kbd-accent), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  transform: translateY(2px);
   border-color: var(--kbd-accent);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--kbd-accent) 42%, transparent), rgba(0, 0, 0, 0.2));
-  color: #fff;
+  background: var(--ktool-brand-soft);
+  box-shadow: 0 0 0 2px var(--ktool-brand-soft-2);
+  color: var(--kbd-accent);
 }
 .kbd-label {
   position: relative;
   z-index: 2;
   white-space: nowrap;
-  pointer-events: none;
 }
 .kbd-count {
   position: absolute;
-  right: 4px;
+  right: 3px;
   bottom: 3px;
   z-index: 2;
+  padding: 1px 3px;
+  border-radius: 3px;
+  background: var(--ktool-surface);
+  color: var(--kbd-accent);
   font-size: 9px;
   font-weight: 700;
   line-height: 1;
-  padding: 1px 3px;
-  border-radius: 5px;
-  color: var(--kbd-accent);
-  background: rgba(0, 0, 0, 0.35);
-  pointer-events: none;
-}
-.kbd-glow {
-  position: absolute;
-  inset: -2px;
-  border-radius: 12px;
-  opacity: 0;
-  background: radial-gradient(circle at center, var(--kbd-accent), transparent 70%);
-  transition: opacity 0.2s ease;
-  pointer-events: none;
-  z-index: 0;
-}
-.kbd-key.is-active .kbd-glow {
-  opacity: 0.55;
 }
 .kbd-ripple {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 14px;
-  height: 14px;
-  border-radius: 999px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
   background: var(--kbd-accent);
-  transform: translate(-50%, -50%) scale(0);
-  animation: kbd-ripple-anim 0.6s ease-out forwards;
+  animation: kbd-ripple 420ms ease-out forwards;
   pointer-events: none;
-  z-index: 1;
-}
-@keyframes kbd-ripple-anim {
-  0% {
-    transform: translate(-50%, -50%) scale(0);
-    opacity: 0.55;
-  }
-  100% {
-    transform: translate(-50%, -50%) scale(6);
-    opacity: 0;
-  }
 }
 .kbd-pop-layer {
   position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  height: 0;
-  z-index: 3;
+  inset: 0;
   pointer-events: none;
+  z-index: 3;
 }
 .kbd-pop-bubble {
   position: absolute;
   left: 50%;
-  top: 0;
-  transform: translateX(-50%);
-  font-size: 12px;
-  font-weight: 800;
+  top: 2px;
   color: var(--kbd-accent);
-  text-shadow: 0 0 8px var(--kbd-accent);
-}
-.kbd-pop-enter-active {
-  animation: kbd-pop-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-}
-.kbd-pop-leave-active {
-  opacity: 0;
-}
-@keyframes kbd-pop-up {
-  0% {
-    opacity: 0;
-    transform: translate(-50%, 6px) scale(0.6);
-  }
-  25% {
-    opacity: 1;
-    transform: translate(-50%, -6px) scale(1.1);
-  }
-  100% {
-    opacity: 0;
-    transform: translate(-50%, -30px) scale(0.9);
-  }
-}
-
-/* 紧凑模式（桌面小插件用） */
-.kbd-visual.compact .kbd-key {
-  height: 34px;
-  border-radius: 7px;
   font-size: 10px;
+  font-weight: 700;
+}
+.kbd-pop-enter-active { animation: kbd-pop 520ms ease-out forwards; }
+.kbd-pop-leave-active { opacity: 0; }
+@keyframes kbd-ripple {
+  from { opacity: 0.28; transform: translate(-50%, -50%) scale(0); }
+  to { opacity: 0; transform: translate(-50%, -50%) scale(5); }
+}
+@keyframes kbd-pop {
+  from { opacity: 0; transform: translate(-50%, 4px); }
+  30% { opacity: 1; }
+  to { opacity: 0; transform: translate(-50%, -20px); }
+}
+.kbd-visual.compact {
+  min-width: 760px;
+}
+.kbd-visual.compact .kbd-key {
+  height: 32px;
+  border-radius: 5px;
+  font-size: 9px;
+}
+.kbd-visual.compact .kbd-row--spacer,
+.kbd-visual.compact .kbd-row--spacer .kbd-key {
+  height: 5px;
 }
 </style>

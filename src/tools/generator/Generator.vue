@@ -58,6 +58,7 @@ import { NButton, NInputNumber, NSwitch, NRadioGroup, NRadioButton, NCheckbox, u
 import ToolPage from "@/components/tool/ToolPage.vue";
 import ToolToolbar from "@/components/tool/ToolToolbar.vue";
 import EditorPane from "@/components/tool/EditorPane.vue";
+import { parseHistoryInput, useToolHistory } from "@/composables/useToolHistory";
 
 const message = useMessage();
 
@@ -72,6 +73,28 @@ const pwdLen = ref(16);
 const pwdCount = ref(5);
 const pwdExcludeSimilar = ref(true);
 const opt = reactive({ upper: true, lower: true, digit: true, symbol: true });
+const history = useToolHistory("generator", "生成器", (item) => {
+  const saved = parseHistoryInput<{
+    mode: "uuid" | "pwd";
+    uuidCount?: number;
+    uuidDashes?: boolean;
+    uuidUpper?: boolean;
+    pwdLen?: number;
+    pwdCount?: number;
+    pwdExcludeSimilar?: boolean;
+    opt?: typeof opt;
+  }>(item.input);
+  if (!saved) return;
+  mode.value = saved.mode;
+  uuidCount.value = saved.uuidCount ?? uuidCount.value;
+  uuidDashes.value = saved.uuidDashes ?? uuidDashes.value;
+  uuidUpper.value = saved.uuidUpper ?? uuidUpper.value;
+  pwdLen.value = saved.pwdLen ?? pwdLen.value;
+  pwdCount.value = saved.pwdCount ?? pwdCount.value;
+  pwdExcludeSimilar.value = saved.pwdExcludeSimilar ?? pwdExcludeSimilar.value;
+  if (saved.opt) Object.assign(opt, saved.opt);
+  output.value = item.output;
+});
 
 function uuidV4(): string {
   const b = new Uint8Array(16);
@@ -91,32 +114,62 @@ function genUuid(): string {
 }
 
 function genPassword(): string {
-  let pool = "";
-  if (opt.upper) pool += "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  if (opt.lower) pool += "abcdefghijklmnopqrstuvwxyz";
-  if (opt.digit) pool += "0123456789";
-  if (opt.symbol) pool += "!@#$%^&*()-_=+[]{};:,.<>?";
-  if (pwdExcludeSimilar.value) pool = pool.replace(/[0O1lI]/g, "");
+  const groups = [
+    opt.upper ? "ABCDEFGHIJKLMNOPQRSTUVWXYZ" : "",
+    opt.lower ? "abcdefghijklmnopqrstuvwxyz" : "",
+    opt.digit ? "0123456789" : "",
+    opt.symbol ? "!@#$%^&*()-_=+[]{};:,.<>?" : "",
+  ]
+    .map((group) => pwdExcludeSimilar.value ? group.replace(/[0O1lI]/g, "") : group)
+    .filter(Boolean);
+  const pool = groups.join("");
   if (!pool) return "";
-  const arr = new Uint32Array(pwdLen.value);
-  crypto.getRandomValues(arr);
-  let out = "";
-  for (let i = 0; i < pwdLen.value; i++) out += pool[arr[i] % pool.length];
-  return out;
+  const length = Math.max(groups.length, Number(pwdLen.value) || 16);
+  const chars = groups.map((group) => group[randomIndex(group.length)]);
+  while (chars.length < length) chars.push(pool[randomIndex(pool.length)]);
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = randomIndex(i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars.join("");
+}
+
+function randomIndex(max: number): number {
+  const range = 0x1_0000_0000;
+  const limit = range - (range % max);
+  const value = new Uint32Array(1);
+  do crypto.getRandomValues(value); while (value[0] >= limit);
+  return value[0] % max;
 }
 
 function generate() {
   if (mode.value === "uuid") {
-    output.value = Array.from({ length: uuidCount.value }, () => genUuid()).join("\n");
+    const count = Math.max(1, Number(uuidCount.value) || 1);
+    output.value = Array.from({ length: count }, () => genUuid()).join("\n");
   } else {
     if (!opt.upper && !opt.lower && !opt.digit && !opt.symbol) {
       message.warning("请至少选择一种字符类型");
       return;
     }
     const list: string[] = [];
-    for (let i = 0; i < pwdCount.value; i++) list.push(genPassword());
+    const count = Math.max(1, Number(pwdCount.value) || 1);
+    for (let i = 0; i < count; i++) list.push(genPassword());
     output.value = list.join("\n");
   }
+  history.record({
+    title: mode.value === "uuid" ? `UUID · ${uuidCount.value} 个` : `随机密码 · ${pwdCount.value} 个`,
+    input: JSON.stringify({
+      mode: mode.value,
+      uuidCount: uuidCount.value,
+      uuidDashes: uuidDashes.value,
+      uuidUpper: uuidUpper.value,
+      pwdLen: pwdLen.value,
+      pwdCount: pwdCount.value,
+      pwdExcludeSimilar: pwdExcludeSimilar.value,
+      opt,
+    }),
+    output: output.value,
+  });
 }
 
 async function copyOutput() {

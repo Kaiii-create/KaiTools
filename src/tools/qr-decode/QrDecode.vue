@@ -52,7 +52,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, onUnmounted } from "vue";
 import { NButton, NIcon, NInput, NTag, useMessage } from "naive-ui";
 import { ImageOutline, LinkOutline } from "@vicons/ionicons5";
 import ToolPage from "@/components/tool/ToolPage.vue";
@@ -61,6 +61,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { readFile } from "@tauri-apps/plugin-fs";
 import { invoke } from "@tauri-apps/api/core";
 import jsQR from "jsqr";
+import { parseHistoryInput, useToolHistory } from "@/composables/useToolHistory";
 
 const message = useMessage();
 const previewUrl = ref("");
@@ -70,6 +71,13 @@ const statusType = ref<"success" | "warning" | "error" | "default">("default");
 const dragOver = ref(false);
 const urlInput = ref("");
 const loadingUrl = ref(false);
+const history = useToolHistory("qr-decode", "二维码解码", (item) => {
+  const saved = parseHistoryInput<{ url?: string }>(item.input);
+  urlInput.value = saved?.url ?? "";
+  result.value = item.output;
+  status.value = "已从历史记录恢复";
+  statusType.value = "success";
+});
 
 async function pickImage() {
   const selected = await open({
@@ -83,17 +91,20 @@ async function onDrop(e: DragEvent) {
   dragOver.value = false;
   const file = e.dataTransfer?.files?.[0];
   if (!file) return;
+  if (!file.type.startsWith("image/") || file.size > 20 * 1024 * 1024) {
+    message.error("请选择不超过 20 MB 的图片");
+    return;
+  }
   const bytes = new Uint8Array(await file.arrayBuffer());
-  const url = URL.createObjectURL(new Blob([bytes]));
-  previewUrl.value = url;
+  const url = setPreviewBlob(new Blob([bytes]));
   await decodeFromUrl(url);
 }
 
 async function loadPath(path: string) {
   try {
     const bytes = await readFile(path);
-    const url = URL.createObjectURL(new Blob([bytes]));
-    previewUrl.value = url;
+    if (bytes.byteLength > 20 * 1024 * 1024) throw new Error("图片不能超过 20 MB");
+    const url = setPreviewBlob(new Blob([bytes]));
     await decodeFromUrl(url);
   } catch (err) {
     message.error("读取图片失败");
@@ -114,8 +125,7 @@ async function decodeUrl() {
   try {
     const bytes = await invoke<number[]>("fetch_image_bytes", { url: u });
     const blob = new Blob([new Uint8Array(bytes)]);
-    const url = URL.createObjectURL(blob);
-    previewUrl.value = url;
+    const url = setPreviewBlob(blob);
     await decodeFromUrl(url);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -169,6 +179,11 @@ function decodeImageData(data: ImageData) {
     result.value = code.data;
     status.value = "解码成功";
     statusType.value = "success";
+    history.record({
+      title: `解码 · ${code.data.slice(0, 48)}`,
+      input: JSON.stringify({ url: urlInput.value.trim() }),
+      output: code.data,
+    });
     message.success("解码成功");
   } else {
     result.value = "";
@@ -190,9 +205,23 @@ async function copyResult() {
 
 function clearAll() {
   result.value = "";
-  previewUrl.value = "";
+  revokePreview();
   status.value = "";
 }
+
+function setPreviewBlob(blob: Blob): string {
+  revokePreview();
+  const url = URL.createObjectURL(blob);
+  previewUrl.value = url;
+  return url;
+}
+
+function revokePreview() {
+  if (previewUrl.value.startsWith("blob:")) URL.revokeObjectURL(previewUrl.value);
+  previewUrl.value = "";
+}
+
+onUnmounted(revokePreview);
 </script>
 
 <style scoped>

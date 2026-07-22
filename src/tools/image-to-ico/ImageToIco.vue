@@ -55,7 +55,7 @@
             </div>
             <div class="row">
               <span class="label">自定义尺寸</span>
-              <n-input-number v-model:value="customSize" :min="16" :max="512" size="small" />
+              <n-input-number v-model:value="customSize" :min="16" :max="256" size="small" />
               <n-button size="small" @click="addCustomSize">添加</n-button>
             </div>
             <n-text depth="3" style="font-size: 12px">
@@ -88,7 +88,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, onUnmounted } from "vue";
 import { NButton, NCard, NSpace, NSelect, NInputNumber, NTag, NText, NIcon, useMessage } from "naive-ui";
 import ToolPage from "@/components/tool/ToolPage.vue";
 import ToolToolbar from "@/components/tool/ToolToolbar.vue";
@@ -134,10 +134,26 @@ function onDrop(e: DragEvent) {
 }
 
 function processFile(file: File) {
-  previewUrl.value = URL.createObjectURL(file);
-  imageLoaded.value = true;
+  if (!file.type.startsWith("image/")) {
+    message.error("请选择有效图片文件");
+    return;
+  }
+  revokePreview();
+  imageLoaded.value = false;
   converted.value = false;
-  status.value = "";
+  const url = URL.createObjectURL(file);
+  const image = new Image();
+  image.onload = () => {
+    previewUrl.value = url;
+    imageLoaded.value = true;
+    converted.value = false;
+    status.value = "";
+  };
+  image.onerror = () => {
+    URL.revokeObjectURL(url);
+    message.error("图片无法读取");
+  };
+  image.src = url;
 }
 
 function addCustomSize() {
@@ -148,6 +164,10 @@ function addCustomSize() {
 
 async function onConvert() {
   if (!previewUrl.value) return;
+  if (selectedSizes.value.length === 0) {
+    message.warning("请至少选择一个 ICO 尺寸");
+    return;
+  }
   try {
     const icoData = await createIco();
     icoBlob.value = new Blob([icoData.buffer as ArrayBuffer], { type: "image/x-icon" });
@@ -163,7 +183,10 @@ async function onConvert() {
 
 async function createIco(): Promise<Uint8Array> {
   const image = await loadImage(previewUrl.value);
-  const sizes = [...new Set(selectedSizes.value)].sort((a, b) => a - b);
+  const sizes = [...new Set(selectedSizes.value)]
+    .filter((size) => Number.isInteger(size) && size >= 16 && size <= 256)
+    .sort((a, b) => a - b);
+  if (sizes.length === 0) throw new Error("请至少选择一个 16-256 的有效尺寸");
   const headers: Uint8Array[] = [];
   const data: Uint8Array[] = [];
   let offset = 6 + sizes.length * 16;
@@ -171,8 +194,9 @@ async function createIco(): Promise<Uint8Array> {
   for (const size of sizes) {
     const resized = await resizeImage(image, size, size);
     const png = await canvasToPng(resized);
-    const width = size <= 256 ? size : 0;
-    const height = size <= 256 ? size : 0;
+    // ICO 目录项以 0 表示 256px。
+    const width = size === 256 ? 0 : size;
+    const height = size === 256 ? 0 : size;
     const bitsPerPixel = 32;
     const bytesInRes = png.length;
 
@@ -221,17 +245,26 @@ function resizeImage(img: HTMLImageElement, width: number, height: number): Prom
     const ctx = canvas.getContext("2d")!;
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
-    ctx.drawImage(img, 0, 0, width, height);
+    ctx.clearRect(0, 0, width, height);
+    const scale = Math.min(width / img.naturalWidth, height / img.naturalHeight);
+    const drawWidth = img.naturalWidth * scale;
+    const drawHeight = img.naturalHeight * scale;
+    ctx.drawImage(img, (width - drawWidth) / 2, (height - drawHeight) / 2, drawWidth, drawHeight);
     resolve(canvas);
   });
 }
 
 function canvasToPng(canvas: HTMLCanvasElement): Promise<Uint8Array> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error("图片编码失败"));
+        return;
+      }
       const reader = new FileReader();
       reader.onloadend = () => resolve(new Uint8Array(reader.result as ArrayBuffer));
-      reader.readAsArrayBuffer(blob!);
+      reader.onerror = () => reject(new Error("图片数据读取失败"));
+      reader.readAsArrayBuffer(blob);
     }, "image/png");
   });
 }
@@ -265,13 +298,20 @@ async function onDownload() {
 }
 
 function onClear() {
-  previewUrl.value = "";
+  revokePreview();
   imageLoaded.value = false;
   converted.value = false;
   icoBlob.value = null;
   status.value = "";
   if (fileInput.value) fileInput.value.value = "";
 }
+
+function revokePreview() {
+  if (previewUrl.value.startsWith("blob:")) URL.revokeObjectURL(previewUrl.value);
+  previewUrl.value = "";
+}
+
+onUnmounted(revokePreview);
 </script>
 
 <style scoped>

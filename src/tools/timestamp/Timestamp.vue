@@ -86,6 +86,7 @@ import { NButton, NInput, NCard, NTag, NIcon, NRadioGroup, NRadioButton, NDatePi
 import ToolPage from "@/components/tool/ToolPage.vue";
 import ToolToolbar from "@/components/tool/ToolToolbar.vue";
 import { CopyOutline as CopyIcon } from "@vicons/ionicons5";
+import { parseHistoryInput, useToolHistory } from "@/composables/useToolHistory";
 
 interface Line { label: string; value: string }
 
@@ -98,6 +99,18 @@ const tsLines = ref<Line[]>([]); const tsError = ref("");
 
 const dateInput = ref<number | null>(null);
 const dateLines = ref<Line[]>([]);
+const history = useToolHistory("timestamp", "时间戳转换", (item) => {
+  const saved = parseHistoryInput<{ kind: "timestamp" | "date"; value: string | number; unit?: "auto" | "s" | "ms" }>(item.input);
+  if (!saved) return;
+  if (saved.kind === "timestamp") {
+    tsInput.value = String(saved.value);
+    tsUnit.value = saved.unit ?? "auto";
+    onTsInput();
+  } else {
+    dateInput.value = Number(saved.value);
+    onDateInput();
+  }
+});
 
 let timer: ReturnType<typeof setInterval> | null = null;
 
@@ -121,11 +134,11 @@ function onTsInput() {
   const raw = tsInput.value.trim();
   if (!raw) { tsLines.value = []; return; }
   const num = Number(raw);
-  if (isNaN(num)) { tsLines.value = []; tsError.value = "请输入数字"; return; }
+  if (!Number.isFinite(num)) { tsLines.value = []; tsError.value = "请输入有限数字"; return; }
   let ms: number;
   if (tsUnit.value === "s") ms = num * 1000;
   else if (tsUnit.value === "ms") ms = num;
-  else ms = raw.length <= 10 ? num * 1000 : num;
+  else ms = Math.abs(num) < 100_000_000_000 ? num * 1000 : num;
   const d = new Date(ms);
   if (isNaN(d.getTime())) { tsLines.value = []; tsError.value = "无效时间戳"; return; }
   tsLines.value = [
@@ -136,6 +149,11 @@ function onTsInput() {
     { label: "时间戳(毫秒)", value: String(d.getTime()) },
     { label: "星期", value: `星期${["日","一","二","三","四","五","六"][d.getDay()]}` },
   ];
+  history.recordDebounced({
+    title: `时间戳 ${raw}`,
+    input: JSON.stringify({ kind: "timestamp", value: raw, unit: tsUnit.value }),
+    output: tsLines.value.map((line) => `${line.label}: ${line.value}`).join("\n"),
+  });
 }
 
 function onDateInput() {
@@ -147,6 +165,11 @@ function onDateInput() {
     { label: "ISO", value: d.toISOString() },
     { label: "UTC", value: d.toUTCString() },
   ];
+  history.record({
+    title: formatLocal(d),
+    input: JSON.stringify({ kind: "date", value: dateInput.value }),
+    output: dateLines.value.map((line) => `${line.label}: ${line.value}`).join("\n"),
+  });
 }
 
 async function onCopy(text: string, label: string) {

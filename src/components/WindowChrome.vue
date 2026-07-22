@@ -21,13 +21,13 @@
         :title="maximized ? '还原' : '最大化'"
         @click="toggleMaximize"
       >
-        <n-icon :size="14">
+        <n-icon :size="16">
           <CopyOutline v-if="maximized" />
           <SquareOutline v-else />
         </n-icon>
       </button>
       <button class="window-control window-control--close" aria-label="关闭" title="关闭" @click="close">
-        <n-icon :size="17"><CloseOutline /></n-icon>
+        <n-icon :size="16"><CloseOutline /></n-icon>
       </button>
     </div>
   </header>
@@ -74,6 +74,7 @@ const isTauri = "__TAURI_INTERNALS__" in window;
 const showCloseDialog = ref(false);
 const noAskAgain = ref(false);
 let unlistenResize: (() => void) | undefined;
+let unlistenCloseRequest: (() => void) | undefined;
 
 async function currentWindow() {
   const { getCurrentWindow } = await import("@tauri-apps/api/window");
@@ -141,9 +142,16 @@ onMounted(async () => {
   const appWindow = await currentWindow();
   await syncMaximized();
   unlistenResize = await appWindow.onResized(syncMaximized);
+  unlistenCloseRequest = await appWindow.listen("request-close-choice", () => {
+    noAskAgain.value = false;
+    showCloseDialog.value = true;
+  });
 });
 
-onUnmounted(() => unlistenResize?.());
+onUnmounted(() => {
+  unlistenResize?.();
+  unlistenCloseRequest?.();
+});
 </script>
 
 <style scoped>
@@ -164,13 +172,13 @@ onUnmounted(() => unlistenResize?.());
   padding-left: 12px;
 }
 .window-brand-mark {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   object-fit: contain;
 }
 .window-brand-name {
   color: var(--ktool-text);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
 }
 .window-brand-mark,
@@ -215,37 +223,38 @@ onUnmounted(() => unlistenResize?.());
 }
 .close-dialog {
   width: 320px;
-  padding: 20px;
+  padding: 24px;
   border-radius: 12px;
   background: var(--ktool-surface);
   border: 1px solid var(--ktool-border);
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--ktool-shadow-lg);
   color: var(--ktool-text);
 }
 .close-dialog-title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 .close-dialog-desc {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--ktool-text-mute);
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 .close-option {
   width: 100%;
   text-align: left;
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding: 10px 12px;
+  gap: 4px;
+  padding: 12px;
   margin-bottom: 8px;
   border: 1px solid var(--ktool-border);
-  border-radius: 9px;
+  border-radius: 8px;
   background: var(--ktool-surface-2);
   color: var(--ktool-text);
   cursor: pointer;
-  transition: border-color 150ms ease, background 150ms ease;
+  transition: border-color var(--ktool-duration) var(--ktool-ease),
+    background var(--ktool-duration) var(--ktool-ease);
 }
 .close-option:hover {
   border-color: var(--ktool-brand);
@@ -263,9 +272,9 @@ onUnmounted(() => unlistenResize?.());
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--ktool-text-soft);
-  margin: 6px 2px 14px;
+  margin: 8px 0 16px;
   cursor: pointer;
   user-select: none;
 }
@@ -274,13 +283,14 @@ onUnmounted(() => unlistenResize?.());
 }
 .close-cancel {
   width: 100%;
-  padding: 9px;
+  padding: 12px;
   border: 0;
-  border-radius: 9px;
+  border-radius: 6px;
   background: var(--ktool-surface-3);
   color: var(--ktool-text-soft);
   font-size: 13px;
   cursor: pointer;
+  transition: color var(--ktool-duration) var(--ktool-ease);
 }
 .close-cancel:hover {
   color: var(--ktool-text);

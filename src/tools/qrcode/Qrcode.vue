@@ -161,7 +161,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch, onMounted } from "vue";
+import { ref, reactive, watch, onMounted, onUnmounted } from "vue";
 import {
   NButton, NInput, NCard, NSpace, NSlider, NSelect, NColorPicker,
   NSwitch, NRadioGroup, NRadioButton, NTag, NAlert, NText, useMessage,
@@ -169,6 +169,7 @@ import {
 import ToolToolbar from "@/components/tool/ToolToolbar.vue";
 import { drawQrcode, type QrOptions, type DotStyle, type EyeStyle, type ErrorLevel } from "./draw";
 import { downloadFile, canvasToBlob } from "@/lib/download";
+import { parseHistoryInput, useToolHistory } from "@/composables/useToolHistory";
 
 const message = useMessage();
 
@@ -197,6 +198,13 @@ const opts = reactive<QrOptions>({
   textSize: 18,
   textColor: "#000000",
 });
+const history = useToolHistory("qrcode", "二维码生成", (item) => {
+  const saved = parseHistoryInput<{ text: string; transparent: boolean; options: Partial<QrOptions> }>(item.input);
+  if (!saved) return;
+  input.value = saved.text;
+  bgTransparent.value = saved.transparent;
+  Object.assign(opts, saved.options, { logo: null });
+});
 
 const errorOptions = [
   { label: "L (7%)", value: "L" },
@@ -219,6 +227,7 @@ const eyeStyles: { label: string; value: EyeStyle }[] = [
 ];
 
 let timer: ReturnType<typeof setTimeout> | null = null;
+let logoObjectUrl: string | null = null;
 
 // 监听所有配置变化（input + opts + 背景透明开关）
 watch([input, opts, bgTransparent], () => {
@@ -233,6 +242,17 @@ function generate() {
   try {
     drawQrcode(canvasRef.value, { ...opts, text: input.value, bgColor: finalBg });
     errorMsg.value = "";
+    if (input.value) {
+      history.recordDebounced({
+        title: `二维码 · ${input.value.slice(0, 48)}`,
+        input: JSON.stringify({
+          text: input.value,
+          transparent: bgTransparent.value,
+          options: { ...opts, text: "", logo: null },
+        }),
+        output: "二维码配置",
+      });
+    }
   } catch (e) {
     errorMsg.value = `生成失败：${(e as Error).message}`;
   }
@@ -242,18 +262,30 @@ function onLogoChange(e: Event) {
   const target = e.target as HTMLInputElement;
   const file = target.files?.[0];
   if (!file) return;
+  if (logoObjectUrl) URL.revokeObjectURL(logoObjectUrl);
+  logoObjectUrl = URL.createObjectURL(file);
   const img = new Image();
   img.onload = () => {
     opts.logo = img;
+    if (opts.errorLevel !== "H") {
+      opts.errorLevel = "H";
+      message.info("已自动将纠错级别调整为 H，以提高带 Logo 二维码的可识别性");
+    }
   };
-  img.onerror = () => message.error("图片加载失败");
-  img.src = URL.createObjectURL(file);
+  img.onerror = () => {
+    if (logoObjectUrl) URL.revokeObjectURL(logoObjectUrl);
+    logoObjectUrl = null;
+    message.error("图片加载失败");
+  };
+  img.src = logoObjectUrl;
   // 重置 input，允许重复选择同一文件
   target.value = "";
 }
 
 function onLogoClear() {
   opts.logo = null;
+  if (logoObjectUrl) URL.revokeObjectURL(logoObjectUrl);
+  logoObjectUrl = null;
 }
 
 async function onDownload() {
@@ -272,12 +304,16 @@ async function onDownload() {
 
 function onClear() {
   input.value = "";
-  opts.logo = null;
+  onLogoClear();
   opts.bottomText = "";
   errorMsg.value = "";
 }
 
 onMounted(() => generate());
+onUnmounted(() => {
+  if (timer) clearTimeout(timer);
+  if (logoObjectUrl) URL.revokeObjectURL(logoObjectUrl);
+});
 </script>
 
 <style scoped>

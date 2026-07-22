@@ -25,7 +25,7 @@ export interface ToolModule {
   description?: string;
   /** 图标组件（vicons） */
   icon: Component;
-  /** 侧栏与标题栏中的工具强调色 */
+  /** 工具专属结果高亮色；禁止用于侧栏/标题栏框架着色 */
   accent?: string;
   /** 分类 */
   category: ToolCategory;
