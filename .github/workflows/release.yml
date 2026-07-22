@@ -4,6 +4,13 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to build, for example v0.1.0
+        required: true
+        type: string
+
 permissions:
   contents: write
 
@@ -13,6 +20,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -39,7 +48,7 @@ jobs:
       - name: Verify release version
         shell: pwsh
         run: |
-          $tagVersion = "${{ github.ref_name }}".TrimStart("v")
+          $tagVersion = "${{ inputs.tag || github.ref_name }}".TrimStart("v")
           $packageVersion = (Get-Content package.json -Raw | ConvertFrom-Json).version
           $tauriVersion = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
           if ($tagVersion -ne $packageVersion -or $tagVersion -ne $tauriVersion) {
@@ -51,14 +60,24 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: KTool ${{ github.ref_name }}
+          tagName: ${{ inputs.tag || github.ref_name }}
+          releaseName: KTool ${{ inputs.tag || github.ref_name }}
           releaseBody: |
-            下载 `KTool_*_x64-setup.exe` 安装版，或下载 `.msi` 安装包。
+            下载 `KTool_*_x64-setup.exe`，双击即可安装。
 
-            Windows 可能提示“未知发布者”，这是因为当前版本尚未购买代码签名证书，请确认下载来源为本仓库后继续安装。
+            若 Windows 显示“未知发布者”，说明该构建尚未完成代码签名。请确认下载来源为本仓库后继续安装。
+
+            ## Code signing policy
+
+            Free code signing provided by [SignPath.io](https://about.signpath.io/), certificate by [SignPath Foundation](https://signpath.org/).
+
+            - Committers and reviewers: [Kaiii-create](https://github.com/Kaiii-create)
+            - Approvers: [Kaiii-create](https://github.com/Kaiii-create)
+            - Privacy policy: [PRIVACY.md](https://github.com/Kaiii-create/KaiTools/blob/main/PRIVACY.md)
+
+            This program will not transfer any information to other networked systems unless specifically requested by the user, such as when using the HTTP request tool, loading a user-provided remote resource, or opening an external link.
           generateReleaseNotes: true
           releaseDraft: false
           prerelease: false
+          args: --bundles nsis
           releaseAssetNamePattern: KTool_[version]_[arch][setup].[ext]
-
