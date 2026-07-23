@@ -48,6 +48,8 @@ let py = 0;
 let lx = 0; // 放大镜左上角坐标（偏移到光标右侧，避免遮挡取色点）
 let ly = 0;
 let rafId = 0;
+let drawInFlight = false;
+let closing = false;
 
 function rgbToHex(r: number, g: number, b: number): string {
   const h = (n: number) => Math.max(0, Math.min(255, n)).toString(16).padStart(2, "0");
@@ -72,14 +74,19 @@ function scheduleDraw() {
 }
 
 async function draw() {
+  if (drawInFlight || closing) return;
   const canvas = canvasRef.value;
   if (!canvas) return;
+  drawInFlight = true;
   let res: PickerSample;
   try {
     res = await invoke<PickerSample>("sample_screen_grid", { radius: RADIUS });
   } catch {
     return;
+  } finally {
+    drawInFlight = false;
   }
+  if (closing) return;
   px = res.x + (res.w - 1) / 2;
   py = res.y + (res.h - 1) / 2;
   computeLoupePos();
@@ -90,14 +97,14 @@ async function draw() {
   canvas.style.top = ly + "px";
   ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
-  // grid 为扁平化 BGR 字节数组，长度 = w*h*3（每个像素 [B, G, R]）
+  // grid 为扁平化 RGB 字节数组，长度 = w*h*3（每个像素 [R, G, B]）
   for (let i = 0; i < res.grid.length; i += 3) {
     const gi = i / 3;
     const gx = gi % res.w;
     const gy = Math.floor(gi / res.w);
-    const b = res.grid[i];
+    const r = res.grid[i];
     const g = res.grid[i + 1];
-    const r = res.grid[i + 2];
+    const b = res.grid[i + 2];
     ctx.fillStyle = `rgb(${r},${g},${b})`;
     ctx.fillRect(gx * CELL, gy * CELL, CELL, CELL);
   }
@@ -116,12 +123,12 @@ async function draw() {
   ctx.strokeStyle = "rgba(0,0,0,0.55)";
   ctx.strokeRect(cx - 1, cy - 1, 2, 2);
 
-  // 中心像素（屏幕光标处）：grid 为 BGR，每像素 3 字节
+  // 中心像素（屏幕光标处）：grid 为 RGB，每像素 3 字节
   const centerByte = Math.floor(res.grid.length / 2);
   const cp = centerByte - (centerByte % 3);
-  const cr = res.grid[cp + 2];
+  const cr = res.grid[cp];
   const cg = res.grid[cp + 1];
-  const cb = res.grid[cp];
+  const cb = res.grid[cp + 2];
   current.r = cr;
   current.g = cg;
   current.b = cb;
@@ -136,6 +143,9 @@ function onMove(e: MouseEvent) {
 }
 
 async function pick() {
+  if (closing) return;
+  closing = true;
+  stopSampling();
   let hex = curHex.value;
   // 兜底：若尚未采样到（极少见），实时取一次真实像素
   if (!hex || hex === "#000000") {
@@ -152,7 +162,7 @@ async function pick() {
       await emitTo("main", "color-picked", { hex });
     } catch {}
   }
-  await getCurrentWebviewWindow().close();
+  await getCurrentWebviewWindow().close().catch(() => {});
 }
 
 async function onDown(e: MouseEvent) {
@@ -161,7 +171,10 @@ async function onDown(e: MouseEvent) {
 }
 
 async function cancelPick() {
-  await getCurrentWebviewWindow().close();
+  if (closing) return;
+  closing = true;
+  stopSampling();
+  await getCurrentWebviewWindow().close().catch(() => {});
 }
 
 function onKey(e: KeyboardEvent) {
@@ -170,15 +183,26 @@ function onKey(e: KeyboardEvent) {
 
 let intervalId: ReturnType<typeof setInterval> | null = null;
 
+function stopSampling() {
+  if (intervalId) {
+    clearInterval(intervalId);
+    intervalId = null;
+  }
+  if (rafId) {
+    cancelAnimationFrame(rafId);
+    rafId = 0;
+  }
+}
+
 onMounted(() => {
   draw();
-  intervalId = setInterval(draw, 50);
+  intervalId = setInterval(draw, 80);
   window.addEventListener("keydown", onKey);
 });
 
 onUnmounted(() => {
-  if (intervalId) clearInterval(intervalId);
-  if (rafId) cancelAnimationFrame(rafId);
+  closing = true;
+  stopSampling();
   window.removeEventListener("keydown", onKey);
 });
 </script>

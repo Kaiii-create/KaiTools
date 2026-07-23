@@ -8,8 +8,6 @@ export interface SettingsData {
   downloadDir: string | null;
   /** 被隐藏（不在侧边栏显示）的工具 id 列表 */
   hiddenTools: string[];
-  /** 屏幕取色全局快捷键（Tauri 格式，如 "Ctrl+Shift+C"），空表示禁用 */
-  pickerShortcut: string;
   /** 点击关闭按钮时的行为 */
   closeBehavior: CloseBehavior;
   /** 是否开机自启 */
@@ -26,7 +24,6 @@ function load(): SettingsData {
       return {
         downloadDir: parsed.downloadDir ?? null,
         hiddenTools: parsed.hiddenTools ?? [],
-        pickerShortcut: parsed.pickerShortcut ?? "CommandOrControl+Shift+C",
         closeBehavior: parsed.closeBehavior ?? "ask",
         autoStart: parsed.autoStart ?? false,
       };
@@ -37,7 +34,6 @@ function load(): SettingsData {
   return {
     downloadDir: null,
     hiddenTools: [],
-    pickerShortcut: "CommandOrControl+Shift+C",
     closeBehavior: "ask",
     autoStart: false,
   };
@@ -85,11 +81,6 @@ export const useSettingsStore = defineStore("settings", () => {
     persist(data.value);
   }
 
-  function setPickerShortcut(shortcut: string) {
-    data.value.pickerShortcut = shortcut;
-    persist(data.value);
-  }
-
   function setCloseBehavior(behavior: CloseBehavior) {
     data.value.closeBehavior = behavior;
     persist(data.value);
@@ -108,7 +99,6 @@ export const useSettingsStore = defineStore("settings", () => {
     setToolHidden,
     toggleToolHidden,
     showAllTools,
-    setPickerShortcut,
     setCloseBehavior,
     setAutoStart,
   };

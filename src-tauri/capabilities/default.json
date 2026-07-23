@@ -2,7 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "KTool 主窗口与桌面小插件默认权限",
-  "windows": ["main", "kbd-widget", "color-picker"],
+  "windows": ["main", "kbd-widget"],
   "permissions": [
     "core:default",
     "core:window:allow-show",

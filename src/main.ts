@@ -17,12 +17,6 @@ if (hash.startsWith("#/kbd-widget")) {
     document.documentElement.classList.add("kbd-widget-mode");
     app.mount("#app");
   });
-} else if (hash.startsWith("#/color-picker")) {
-  // 屏幕取色 overlay 窗口：透明背景
-  import("./tools/color/PickerRoot.vue").then(({ default: PickerRoot }) => {
-    const app = createApp(PickerRoot);
-    app.mount("#app");
-  });
 } else {
   const app = createApp(App);
   app.use(createPinia());

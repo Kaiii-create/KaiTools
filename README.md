@@ -44,7 +44,7 @@ See the full [Privacy Policy](PRIVACY.md), including local history, keyboard sta
 | --- | --- |
 | 编码与格式化 | JSON 格式化、Base64 / URL 编解码、代码格式化、Markdown 编辑器 |
 | 对比与测试 | 代码对比、正则测试器、HTTP 请求 |
-| 时间与转换 | 时间戳转换、世界时钟、进制转换、颜色工具、图片转 ICO |
+| 时间与转换 | 时间戳转换、世界时钟、进制转换、颜色工具、图片格式互转、Word/PDF 文档转换、PDF 与图片互转 |
 | 二维码 | 二维码生成、二维码解码 |
 | 安全与生成 | MD5 / SHA、UUID、随机密码生成 |
 | 文本效率 | 文本去重、排序、替换、前后缀批处理 |
@@ -54,9 +54,19 @@ See the full [Privacy Policy](PRIVACY.md), including local history, keyboard sta
 
 - 浅色、深色与跟随系统主题。
 - 可配置全局强调色。
+- 可在设置中配置默认下载目录，转换结果无需重复选择保存位置。
 - 有明确输入与输出的工具支持历史记录及一键恢复。
 - 键盘统计支持历史总计、每日数据、87/104 键布局和桌面小窗。
 - Windows 原生安装包，体积和运行开销较低。
+
+### 图片与文档转换
+
+- 图片格式转换支持 PNG、JPG、WebP、BMP、GIF、SVG、ICO 等常用格式输入，并可输出 PNG、JPG、WebP、BMP、ICO。
+- PDF 转图片支持 PNG/JPG、页面范围及 96/150/300 DPI；多页文件会逐页保存到默认下载目录。
+- 多张图片可以按选择顺序合成为 PDF，并可设置页面尺寸与页边距。
+- PDF 与图片转换引擎随 KTool 一起打包，在本机运行，不需要安装 Adobe、LibreOffice 或 Microsoft Word。
+- Word 转 PDF、PDF 转 Word 使用电脑中已安装的桌面版 Microsoft Word；如果 Word 不可用，只会在实际转换时提示。
+- 默认下载目录可在“设置 → 文件下载”中配置、修改或清除。
 
 ## 建议功能与问题反馈
 
@@ -126,15 +136,23 @@ src-tauri/target/release/bundle/msi/
 - `src-tauri/Cargo.toml`
 - `src-tauri/tauri.conf.json`
 
-确认代码已提交并推送后执行：
+发布前建议依次执行前端构建与 Rust 测试：
 
 ```bash
-git tag v0.2.0
-git push origin main
+pnpm run build
+cargo test --manifest-path src-tauri/Cargo.toml
+```
+
+确认测试通过、代码已经提交并推送到 `main` 后，再创建并推送版本标签：
+
+```bash
+git tag -a v0.2.0 -m "KTool v0.2.0"
 git push origin v0.2.0
 ```
 
-随后在仓库的 **Actions** 页面查看构建进度，在 **Releases** 页面确认下载文件和发布说明。
+推送 `v*` 标签后，GitHub Actions 会自动创建 Release 并构建 Windows 安装包。GitHub 还会根据标签自动提供 `Source code (zip)` 和 `Source code (tar.gz)`，不需要手动制作源码压缩包。
+
+随后在仓库的 **Actions** 页面确认发布任务成功，并在 **Releases** 页面检查安装包、源码包和发布说明。
 
 ## 技术栈
 

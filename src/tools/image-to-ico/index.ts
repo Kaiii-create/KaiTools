@@ -4,16 +4,16 @@ import { ImageOutline } from "@vicons/ionicons5";
 
 export const imageToIco: ToolModule = {
   id: "image-to-ico",
-  name: "图片转 ICO",
-  description: "将图片转换为 ICO 图标格式",
+  name: "图片格式转换",
+  description: "PNG、JPG、WebP、BMP、GIF、SVG、ICO 常用格式互转",
   icon: ImageOutline,
   accent: "#3b82f6",
   category: "转换",
-  keywords: ["image", "ico", "icon", "转换", "图标"],
+  keywords: ["image", "png", "jpg", "jpeg", "webp", "bmp", "gif", "svg", "ico", "转换", "图标"],
   component: ImageToIco,
   toHistory(input, output) {
     return {
-      title: String(input ?? "").slice(0, 60) || "图片转ICO记录",
+      title: String(input ?? "").slice(0, 60) || "图片格式转换记录",
       input: String(input ?? ""),
       output: String(output ?? ""),
     };

@@ -7,9 +7,6 @@ use tauri::tray::TrayIconBuilder;
 use tauri::{Emitter, Manager, WindowEvent};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
-/// 屏幕取色快捷键（动态，由前端设置），None 表示禁用
-struct PickerShortcut(Mutex<Option<Shortcut>>);
-
 /// 关闭主窗口时的行为："ask"（弹窗询问）/ "minimize"（最小化到托盘）/ "quit"（直接退出）
 struct CloseMode(Mutex<String>);
 
@@ -43,7 +40,10 @@ fn set_close_mode(app: tauri::AppHandle, mode: String) {
         "minimize" | "quit" => mode,
         _ => "ask".to_string(),
     };
-    *app.state::<CloseMode>().0.lock().unwrap() = m;
+    *app.state::<CloseMode>()
+        .0
+        .lock()
+        .unwrap_or_else(|e| e.into_inner()) = m;
 }
 
 /// 直接退出应用（绕开 CloseRequested 的拦截）
@@ -58,33 +58,6 @@ fn parse_shortcut(s: &str) -> Option<Shortcut> {
         return None;
     }
     s.parse::<Shortcut>().ok()
-}
-
-/// 注册 / 更新 / 禁用屏幕取色全局快捷键。
-/// 任何失败都安全吞掉，绝不 panic（避免 release 下 panic=abort 导致进程崩溃退出）。
-#[tauri::command]
-fn set_picker_shortcut(app: tauri::AppHandle, shortcut: String) -> Result<(), String> {
-    let state = app.state::<PickerShortcut>();
-    // 先注销旧的（忽略任何错误）
-    if let Some(old) = state.0.lock().unwrap().take() {
-        let _ = app.global_shortcut().unregister(old);
-    }
-    // 空字符串表示禁用
-    if shortcut.trim().is_empty() {
-        return Ok(());
-    }
-    match parse_shortcut(&shortcut) {
-        Some(sc) => {
-            // 注册失败（冲突 / 系统保留 / 非法）时安全忽略，不打断应用
-            if app.global_shortcut().register(sc).is_ok() {
-                *state.0.lock().unwrap() = Some(sc);
-                Ok(())
-            } else {
-                Err(format!("快捷键 {shortcut} 注册失败，可能已被占用或属于系统保留快捷键"))
-            }
-        }
-        None => Err(format!("快捷键格式无法解析：{shortcut}")),
-    }
 }
 
 fn toggle_window_visibility(window: &tauri::WebviewWindow) {
@@ -109,7 +82,6 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
-        .manage(PickerShortcut(Mutex::new(None)))
         .manage(CloseMode(Mutex::new("ask".to_string())))
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
@@ -126,19 +98,6 @@ pub fn run() {
                             return;
                         }
                     }
-                    // 屏幕取色：动态快捷键
-                    let ps_opt = {
-                        let state = app.state::<PickerShortcut>();
-                        let guard = state.0.lock().unwrap();
-                        guard.as_ref().map(|s| *s)
-                    };
-                    if let Some(ps) = ps_opt {
-                        if shortcut == &ps {
-                            if let Some(window) = app.get_webview_window("main") {
-                                let _ = window.emit("open-color-picker", ());
-                            }
-                        }
-                    }
                 })
                 .build(),
         )
@@ -150,9 +109,7 @@ pub fn run() {
             commands::keyboard::stop_keyboard_hook,
             commands::http::http_request,
             commands::http::fetch_image_bytes,
-            commands::picker::sample_screen_color,
-            commands::picker::sample_screen_grid,
-            set_picker_shortcut,
+            commands::document::convert_document,
             set_close_mode,
             quit_app,
             get_app_info,
@@ -170,7 +127,12 @@ pub fn run() {
             let close_app = app_handle.clone();
             main_window.on_window_event(move |event| {
                 if let WindowEvent::CloseRequested { api, .. } = event {
-                    let mode = close_app.state::<CloseMode>().0.lock().unwrap().clone();
+                    let mode = close_app
+                        .state::<CloseMode>()
+                        .0
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .clone();
                     if mode == "quit" {
                         // 允许直接退出
                         return;

@@ -16,6 +16,7 @@ import { textBatch } from "./text-batch";
 import { regexTester } from "./regex-tester";
 import { generator } from "./generator";
 import { baseConvert } from "./base-convert";
+import { documentConverter } from "./document-converter";
 
 /** 工具注册表（中央目录）
  *
@@ -51,6 +52,7 @@ register(textBatch);
 register(regexTester);
 register(generator);
 register(baseConvert);
+register(documentConverter);
 
 export const tools = Array.from(registry.values());
 

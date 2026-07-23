@@ -79,5 +79,5 @@ jobs:
           generateReleaseNotes: true
           releaseDraft: false
           prerelease: false
-          args: --bundles nsis
+          args: --bundles nsis,msi
           releaseAssetNamePattern: KTool_[version]_[arch][setup].[ext]

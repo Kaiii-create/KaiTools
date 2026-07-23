@@ -1,7 +1,7 @@
 {
   "name": "ktool",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "KTool - 轻量级开发工具集",
   "type": "module",
   "scripts": {
@@ -28,6 +28,8 @@
     "jsqr": "^1.4.0",
     "marked": "^18.0.6",
     "naive-ui": "^2.38.0",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^6.1.200",
     "pinia": "^2.2.0",
     "prettier": "^3.9.5",
     "qrcode": "^1.5.4",

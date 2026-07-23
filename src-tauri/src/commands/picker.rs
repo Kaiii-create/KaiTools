@@ -36,16 +36,13 @@ pub fn sample_screen_color() -> Result<ScreenColor, String> {
         let mut pt = POINT { x: 0, y: 0 };
         GetCursorPos(&mut pt).map_err(|e| e.to_string())?;
         let hdc = GetDC(None);
+        if hdc.0 == 0 {
+            return Err("无法访问屏幕画面".to_string());
+        }
         let c = GetPixel(hdc, pt.x, pt.y).0;
         let _ = ReleaseDC(None, hdc);
         if c == 0xFFFF_FFFF {
-            return Ok(ScreenColor {
-                r: 0,
-                g: 0,
-                b: 0,
-                x: pt.x,
-                y: pt.y,
-            });
+            return Err("无法读取光标位置的颜色".to_string());
         }
         Ok(ScreenColor {
             r: (c & 0xFF) as u8,
@@ -67,6 +64,9 @@ pub fn sample_screen_grid(radius: i32) -> Result<PickerSample, String> {
         let mut pt = POINT { x: 0, y: 0 };
         GetCursorPos(&mut pt).map_err(|e| e.to_string())?;
         let hdc = GetDC(None);
+        if hdc.0 == 0 {
+            return Err("无法访问屏幕画面".to_string());
+        }
         let mut grid: Vec<u8> = Vec::with_capacity((w * h) as usize * 3);
         for dy in -radius..=radius {
             for dx in -radius..=radius {

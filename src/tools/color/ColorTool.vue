@@ -26,12 +26,6 @@
         </template>
         点击拾色
       </n-button>
-      <n-button size="small" @click="openColorPicker">
-        <template #icon>
-          <n-icon><ScreenIcon /></n-icon>
-        </template>
-        屏幕取色
-      </n-button>
     </div>
 
     <!-- 配置区 -->
@@ -99,26 +93,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from "vue";
+import { ref, computed, watch } from "vue";
 import ToolPage from "@/components/tool/ToolPage.vue";
 import { NCard, NSpace, NInput, NInputNumber, NButton, NIcon, useMessage } from "naive-ui";
-import { ColorPaletteOutline as ColorPickerIcon, ScanOutline as ScreenIcon } from "@vicons/ionicons5";
-import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { openColorPicker } from "@/lib/picker";
+import { ColorPaletteOutline as ColorPickerIcon } from "@vicons/ionicons5";
 import { useToolHistory } from "@/composables/useToolHistory";
 
 const message = useMessage();
-
-const wvw = getCurrentWebviewWindow();
-let unlisten: (() => void) | null = null;
-onMounted(async () => {
-  // 接收屏幕取色窗口回传的颜色
-  unlisten = await wvw.listen<{ hex: string }>("color-picked", (e) => {
-    hex.value = e.payload.hex;
-    syncFromHex();
-  });
-});
-onUnmounted(() => unlisten?.());
 
 const hex = ref("#3b82f6");
 const r = ref(59);

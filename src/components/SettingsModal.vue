@@ -81,6 +81,33 @@
         </div>
       </section>
 
+      <!-- 文件下载 -->
+      <section class="settings-section">
+        <h3 class="settings-h">文件下载</h3>
+        <div class="settings-row">
+          <span class="settings-label">默认目录</span>
+          <n-input
+            :value="settings.data.downloadDir || ''"
+            readonly
+            size="small"
+            class="download-path"
+            placeholder="尚未配置，首次下载时会询问"
+          />
+          <n-button size="small" :loading="choosingDownloadDir" @click="selectDownloadDirectory">
+            选择
+          </n-button>
+          <n-button
+            v-if="settings.data.downloadDir"
+            size="small"
+            quaternary
+            @click="settings.clearDownloadDir()"
+          >
+            清除
+          </n-button>
+        </div>
+        <p class="settings-tip">配置一次后，文档、图片等转换结果会直接保存到这里，不再重复弹窗。</p>
+      </section>
+
       <!-- 快捷键 -->
       <section class="settings-section">
         <h3 class="settings-h">快捷键</h3>
@@ -88,24 +115,6 @@
           <span class="settings-label">命令面板</span>
           <kbd class="settings-kbd">Ctrl</kbd> + <kbd class="settings-kbd">K</kbd>
         </div>
-      </section>
-
-      <!-- 屏幕取色 -->
-      <section class="settings-section">
-        <h3 class="settings-h">屏幕取色</h3>
-        <div class="settings-row">
-          <span class="settings-label">快捷键</span>
-          <n-input
-            :value="recording ? '请按下组合键…' : settings.data.pickerShortcut"
-            readonly
-            size="small"
-            class="shortcut-input"
-          />
-          <n-button size="small" :type="recording ? 'error' : 'default'" @click="toggleRecord">
-            {{ recording ? "停止录制" : "录制" }}
-          </n-button>
-        </div>
-        <p v-if="shortcutError" class="shortcut-error">{{ shortcutError }}</p>
       </section>
 
       <!-- 工具显示 -->
@@ -158,7 +167,7 @@ import { useHistoryStore } from "@/stores/history";
 import { useSettingsStore, type CloseBehavior } from "@/stores/settings";
 import { tools } from "@/tools/registry";
 import appIcon from "@/assets/brand/ktool-app-icon-ui.png";
-import { invoke } from "@tauri-apps/api/core";
+import { chooseDownloadDirectory } from "@/lib/download";
 
 const props = defineProps<{ show: boolean }>();
 const emit = defineEmits<{ (e: "update:show", v: boolean): void }>();
@@ -194,65 +203,23 @@ async function onAutoStartChange(v: boolean) {
   }
 }
 
-const recording = ref(false);
-const shortcutError = ref("");
-
-function toggleRecord() {
-  // 再次点击则停止录制
-  if (recording.value) {
-    recording.value = false;
-    return;
-  }
-  recording.value = true;
-  shortcutError.value = "";
-}
-
-async function onRecordKey(e: KeyboardEvent) {
-  if (!recording.value) return;
-  e.preventDefault();
-  e.stopPropagation();
-  const key = e.key;
-  // 仅修饰键时继续等待真正的按键
-  if (["Control", "Alt", "Shift", "Meta"].includes(key)) return;
-  const parts: string[] = [];
-  if (e.ctrlKey) parts.push("Ctrl");
-  if (e.altKey) parts.push("Alt");
-  if (e.shiftKey) parts.push("Shift");
-  if (e.metaKey) parts.push("Meta");
-  let k = key;
-  if (key === " ") k = "Space";
-  else if (key.length === 1) k = key.toUpperCase();
-  parts.push(k);
-  const combo = parts.join("+");
-  // 必须有非修饰键；纯修饰键组合无效，提示后放弃本次录入
-  if (parts.length === 0) {
-    recording.value = false;
-    return;
-  }
-  const hasNonModifier = !["Ctrl", "Alt", "Shift", "Meta"].includes(k);
-  if (!hasNonModifier) {
-    shortcutError.value = "快捷键必须包含至少一个普通按键（不能只有修饰键）";
-    recording.value = false;
-    return;
-  }
-  shortcutError.value = "";
-  recording.value = false;
+const choosingDownloadDir = ref(false);
+async function selectDownloadDirectory() {
+  if (choosingDownloadDir.value) return;
+  choosingDownloadDir.value = true;
   try {
-    await invoke("set_picker_shortcut", { shortcut: combo });
-    settings.setPickerShortcut(combo);
-  } catch (error) {
-    shortcutError.value = String(error);
+    await chooseDownloadDirectory("选择默认下载目录");
+  } finally {
+    choosingDownloadDir.value = false;
   }
 }
 
 onMounted(() => {
-  window.addEventListener("keydown", onRecordKey, true);
   window.addEventListener("ktool-app-info", syncAbout);
   syncAutoStart();
   syncAbout();
 });
 onUnmounted(() => {
-  window.removeEventListener("keydown", onRecordKey, true);
   window.removeEventListener("ktool-app-info", syncAbout);
 });
 
@@ -338,16 +305,15 @@ watch(() => props.show, (show) => {
   border-radius: 50%;
   background: var(--ktool-text-mute);
 }
-.shortcut-input {
+.download-path {
   flex: 1;
-  max-width: 240px;
 }
 .accent-picker {
   width: 220px;
 }
-.shortcut-error {
+.settings-tip {
   font-size: 12px;
-  color: var(--ktool-danger);
+  color: var(--ktool-text-mute);
   margin: 8px 0 0;
 }
 .tool-toggle-grid {
